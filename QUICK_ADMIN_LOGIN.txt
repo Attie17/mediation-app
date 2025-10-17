@@ -1,0 +1,51 @@
+# Quick Admin Login - Use Browser Console
+
+## To Access All Dashboards:
+
+### Method 1: Browser Console (Fastest)
+1. **Open Developer Console**: Press `F12` (or right-click → Inspect)
+2. **Go to Console tab**
+3. **Copy and paste this code** (then press Enter):
+
+```javascript
+localStorage.setItem('token','dev-fake-token');localStorage.setItem('user',JSON.stringify({id:'862b3a3e-8390-57f8-a307-12004a341a2e',email:'admin@dev.local',name:'Dev Admin',role:'admin'}));localStorage.setItem('activeCaseId','4');localStorage.setItem('devMode','true');location.reload();
+```
+
+4. **Page will reload** - you'll now have admin access to all dashboards!
+
+### Method 2: Open Dev Login Page
+1. Open file explorer
+2. Navigate to: `c:\mediation-app`
+3. Double-click `dev-login.html`
+4. Select **Admin** role
+5. Click "Login as Developer"
+
+### Method 3: Run PowerShell Script
+```powershell
+cd c:\mediation-app
+.\dev-login.ps1
+```
+
+## What You'll Get:
+- ✅ Full access to all 4 dashboards (Admin, Mediator, Divorcee, Lawyer)
+- ✅ No more locked pages
+- ✅ Can test all features
+- ✅ Stays logged in (persistent)
+
+## To Check If You're Logged In:
+In the browser console, type:
+```javascript
+console.log(JSON.parse(localStorage.getItem('user')))
+```
+
+You should see: `{id: "862b3a3e...", email: "admin@dev.local", role: "admin", ...}`
+
+## To Logout:
+```javascript
+localStorage.clear();
+location.reload();
+```
+
+---
+
+**Tip**: Just press F12, paste the one-liner code in the console, and you're done! 🚀

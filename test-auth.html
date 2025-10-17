@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Auth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1e293b;
+            color: white;
+        }
+        .test-section {
+            background: #334155;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #1e293b;
+            color: white;
+            width: 200px;
+        }
+        pre {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Manual Authentication Test</h1>
+    
+    <div class="test-section">
+        <h2>Backend Health Check</h2>
+        <button onclick="testBackend()">Test Backend</button>
+        <pre id="backend-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Login Test</h2>
+        <div>
+            <input type="email" id="login-email" value="admin@test.com" placeholder="Email">
+            <input type="password" id="login-password" value="admin123" placeholder="Password">
+        </div>
+        <button onclick="testLogin()">Test Login</button>
+        <pre id="login-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Register Test</h2>
+        <div>
+            <input type="text" id="reg-name" value="Test User" placeholder="Name">
+            <input type="email" id="reg-email" value="testuser@test.com" placeholder="Email">
+            <input type="password" id="reg-password" value="test123" placeholder="Password">
+            <select id="reg-role" style="padding: 8px; margin: 5px; border-radius: 4px;">
+                <option value="divorcee">Divorcee</option>
+                <option value="mediator">Mediator</option>
+                <option value="lawyer">Lawyer</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <button onclick="testRegister()">Test Register</button>
+        <pre id="register-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Get User Profile Test</h2>
+        <p style="font-size: 12px; color: #94a3b8;">Token from login will be used automatically</p>
+        <button onclick="testUserMe()">Test /api/users/me</button>
+        <pre id="userme-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Saved Token</h2>
+        <pre id="saved-token" style="word-break: break-all;"></pre>
+        <button onclick="clearToken()">Clear Token</button>
+    </div>
+
+    <script>
+        let savedToken = null;
+
+        function displayResult(elementId, result, isError = false) {
+            const el = document.getElementById(elementId);
+            el.className = isError ? 'error' : 'success';
+            el.textContent = JSON.stringify(result, null, 2);
+        }
+
+        async function testBackend() {
+            const resultEl = document.getElementById('backend-result');
+            resultEl.textContent = 'Testing...';
+            try {
+                const response = await fetch('http://localhost:4000');
+                const data = await response.json();
+                displayResult('backend-result', {
+                    status: response.status,
+                    data: data
+                }, false);
+            } catch (error) {
+                displayResult('backend-result', {
+                    error: error.message,
+                    stack: error.stack
+                }, true);
+            }
+        }
+
+        async function testLogin() {
+            const resultEl = document.getElementById('login-result');
+            resultEl.textContent = 'Logging in...';
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('http://localhost:4000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    savedToken = data.token;
+                    document.getElementById('saved-token').textContent = 'Token: ' + savedToken.substring(0, 50) + '...';
+                }
+                
+                displayResult('login-result', {
+                    status: response.status,
+                    data: data
+                }, !response.ok);
+            } catch (error) {
+                displayResult('login-result', {
+                    error: error.message,
+                    stack: error.stack
+                }, true);
+            }
+        }
+
+        async function testRegister() {
+            const resultEl = document.getElementById('register-result');
+            resultEl.textContent = 'Registering...';
+            
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const role = document.getElementById('reg-role').value;
+            
+            try {
+                const response = await fetch('http://localhost:4000/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password, name, role })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    savedToken = data.token;
+                    document.getElementById('saved-token').textContent = 'Token: ' + savedToken.substring(0, 50) + '...';
+                }
+                
+                displayResult('register-result', {
+                    status: response.status,
+                    data: data
+                }, !response.ok);
+            } catch (error) {
+                displayResult('register-result', {
+                    error: error.message,
+                    stack: error.stack
+                }, true);
+            }
+        }
+
+        async function testUserMe() {
+            const resultEl = document.getElementById('userme-result');
+            resultEl.textContent = 'Fetching profile...';
+            
+            if (!savedToken) {
+                displayResult('userme-result', {
+                    error: 'No token available. Please login first.'
+                }, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:4000/api/users/me', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${savedToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                displayResult('userme-result', {
+                    status: response.status,
+                    data: data
+                }, !response.ok);
+            } catch (error) {
+                displayResult('userme-result', {
+                    error: error.message,
+                    stack: error.stack
+                }, true);
+            }
+        }
+
+        function clearToken() {
+            savedToken = null;
+            document.getElementById('saved-token').textContent = 'No token saved';
+        }
+
+        // Check if token exists on load
+        window.onload = function() {
+            if (!savedToken) {
+                document.getElementById('saved-token').textContent = 'No token saved';
+            }
+        };
+    </script>
+</body>
+</html>

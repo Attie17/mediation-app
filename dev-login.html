@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Login - Mediation App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #fff;
+        }
+        .container {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            color: #14b8a6;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .role-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        .role-btn {
+            padding: 16px;
+            background: rgba(20, 184, 166, 0.1);
+            border: 2px solid rgba(20, 184, 166, 0.3);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .role-btn:hover {
+            background: rgba(20, 184, 166, 0.2);
+            border-color: rgba(20, 184, 166, 0.5);
+            transform: translateY(-2px);
+        }
+        .role-btn.active {
+            background: rgba(20, 184, 166, 0.3);
+            border-color: #14b8a6;
+            box-shadow: 0 0 20px rgba(20, 184, 166, 0.3);
+        }
+        .role-icon {
+            font-size: 32px;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #14b8a6 0%, #2563eb 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(20, 184, 166, 0.4);
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }
+        .info strong {
+            color: #60a5fa;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #4ade80;
+            display: block;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #f87171;
+            display: block;
+        }
+        .redirect-msg {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Developer Access</h1>
+        <p class="subtitle">Choose your role for development testing</p>
+        
+        <div class="role-selector">
+            <button class="role-btn" data-role="admin" onclick="selectRole('admin')">
+                <span class="role-icon">👨‍💼</span>
+                <span>Admin</span>
+                <small style="font-size: 11px; color: #94a3b8;">Full Access</small>
+            </button>
+            <button class="role-btn" data-role="mediator" onclick="selectRole('mediator')">
+                <span class="role-icon">⚖️</span>
+                <span>Mediator</span>
+                <small style="font-size: 11px; color: #94a3b8;">Case Manager</small>
+            </button>
+            <button class="role-btn" data-role="divorcee" onclick="selectRole('divorcee')">
+                <span class="role-icon">👤</span>
+                <span>Divorcee</span>
+                <small style="font-size: 11px; color: #94a3b8;">End User</small>
+            </button>
+            <button class="role-btn" data-role="lawyer" onclick="selectRole('lawyer')">
+                <span class="role-icon">👔</span>
+                <span>Lawyer</span>
+                <small style="font-size: 11px; color: #94a3b8;">Legal Rep</small>
+            </button>
+        </div>
+
+        <button class="login-btn" onclick="loginAsRole()">
+            🚀 Login as Developer
+        </button>
+
+        <div class="info">
+            <strong>Developer Mode:</strong><br>
+            • Full access to all pages and features<br>
+            • Bypasses authentication checks<br>
+            • Persistent login (stays signed in)<br>
+            • Active case ID: 4 (for testing)<br>
+            • Real backend user ID included
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let selectedRole = 'admin'; // Default to admin for full access
+
+        // Highlight the default selection on load
+        window.addEventListener('DOMContentLoaded', () => {
+            selectRole('admin');
+        });
+
+        function selectRole(role) {
+            selectedRole = role;
+            
+            // Update UI to show selected role
+            document.querySelectorAll('.role-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-role="${role}"]`).classList.add('active');
+        }
+
+        function loginAsRole() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                // Developer credentials with real backend user IDs
+                const devUsers = {
+                    admin: {
+                        id: '862b3a3e-8390-57f8-a307-12004a341a2e',
+                        email: 'admin@dev.local',
+                        name: 'Dev Admin',
+                        role: 'admin'
+                    },
+                    mediator: {
+                        id: '1a472c78-438c-4b3e-a14d-05ce39d5bfc2',
+                        email: 'mediator@dev.local',
+                        name: 'Dev Mediator',
+                        role: 'mediator'
+                    },
+                    divorcee: {
+                        id: 'dev-divorcee-uuid',
+                        email: 'divorcee@dev.local',
+                        name: 'Dev Divorcee',
+                        role: 'divorcee'
+                    },
+                    lawyer: {
+                        id: 'dev-lawyer-uuid',
+                        email: 'lawyer@dev.local',
+                        name: 'Dev Lawyer',
+                        role: 'lawyer'
+                    }
+                };
+
+                const user = devUsers[selectedRole];
+
+                // Set authentication in localStorage
+                localStorage.setItem('token', 'dev-fake-token');
+                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('activeCaseId', '4');
+                localStorage.setItem('devMode', 'true');
+                localStorage.setItem('lastRoute', '/');
+
+                // Show success message
+                statusEl.className = 'status success';
+                statusEl.innerHTML = `
+                    ✅ Logged in as ${user.name} (${user.role})<br>
+                    <div class="redirect-msg">Redirecting to dashboard in 2 seconds...</div>
+                `;
+
+                // Redirect to the app after 2 seconds
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:5173';
+                }, 2000);
+
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        // Allow keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '1') selectRole('admin');
+            if (e.key === '2') selectRole('mediator');
+            if (e.key === '3') selectRole('divorcee');
+            if (e.key === '4') selectRole('lawyer');
+            if (e.key === 'Enter') loginAsRole();
+        });
+    </script>
+</body>
+</html>
