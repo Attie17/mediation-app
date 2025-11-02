@@ -255,7 +255,7 @@ export function validateEnvironment() {
   }
   
   // Check email configuration if email features enabled
-  if (process.env.ENABLE_EMAIL_NOTIFICATIONS !== 'false') {
+  if (process.env.ENABLE_EMAIL_NOTIFICATIONS === 'true') {
     for (const varName of EMAIL_REQUIRED_VARS) {
       const result = validateVar(varName, isProduction);
       if (!result.valid) {
@@ -266,10 +266,12 @@ export function validateEnvironment() {
         }
       }
     }
+  } else {
+    warnings.push('Email notifications disabled - SMTP variables not required');
   }
   
   // Check file storage configuration if uploads enabled
-  if (process.env.ENABLE_FILE_UPLOADS !== 'false') {
+  if (process.env.ENABLE_FILE_UPLOADS === 'true') {
     for (const varName of FILE_STORAGE_REQUIRED_VARS) {
       const result = validateVar(varName, isProduction);
       if (!result.valid) {
@@ -280,6 +282,8 @@ export function validateEnvironment() {
         }
       }
     }
+  } else {
+    warnings.push('File uploads disabled - Cloudinary variables not required');
   }
   
   // Log warnings
