@@ -16,21 +16,20 @@ const databaseUrl = process.env.DATABASE_URL;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Configure SSL for production Supabase/Railway connections
-const poolConfig = {
-	connectionString: databaseUrl
-};
-
-// Supabase uses connection pooling which requires SSL but doesn't provide valid certs
-// This is the standard configuration for Supabase pooler connections
-// Force SSL configuration for all connections to avoid certificate validation issues
-if (databaseUrl && (databaseUrl.includes('supabase') || databaseUrl.includes('pooler') || process.env.NODE_ENV === 'production')) {
-	poolConfig.ssl = { 
-		rejectUnauthorized: false,
-		// Prevent certificate verification errors in production
-		checkServerIdentity: () => undefined
-	};
+// Configure SSL for production Supabase connections
+// Remove sslmode from connection string and set SSL config explicitly
+let cleanDatabaseUrl = databaseUrl;
+if (databaseUrl && databaseUrl.includes('sslmode=')) {
+	cleanDatabaseUrl = databaseUrl.replace(/[?&]sslmode=\w+/, '');
 }
+
+const poolConfig = {
+	connectionString: cleanDatabaseUrl,
+	// Always set SSL config for Supabase pooler - it requires SSL but uses self-signed certs
+	ssl: {
+		rejectUnauthorized: false
+	}
+};
 
 const pool = new Pool(poolConfig);
 
