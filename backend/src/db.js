@@ -17,19 +17,20 @@ const databaseUrl = process.env.DATABASE_URL;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configure SSL for production Supabase connections
-// Remove sslmode from connection string and set SSL config explicitly
-let cleanDatabaseUrl = databaseUrl;
-if (databaseUrl && databaseUrl.includes('sslmode=')) {
-	cleanDatabaseUrl = databaseUrl.replace(/[?&]sslmode=\w+/, '');
-}
-
+// Supabase pooler requires SSL but uses self-signed certificates
 const poolConfig = {
-	connectionString: cleanDatabaseUrl,
-	// Always set SSL config for Supabase pooler - it requires SSL but uses self-signed certs
-	ssl: {
-		rejectUnauthorized: false
-	}
+	connectionString: databaseUrl
 };
+
+// Force SSL to accept self-signed certificates for Supabase pooler
+if (process.env.NODE_ENV === 'production' || databaseUrl?.includes('supabase') || databaseUrl?.includes('pooler')) {
+	poolConfig.ssl = {
+		rejectUnauthorized: false,
+		// Additional SSL options to bypass certificate validation
+		ca: false,
+		checkServerIdentity: () => undefined
+	};
+}
 
 const pool = new Pool(poolConfig);
 

@@ -31,3 +31,7 @@ services:
         value: https://www.divorcesmediator.com,https://divorcesmediator.com,http://localhost:5173,http://localhost:3000
       - key: PORT
         value: 3000
+      - key: NODE_TLS_REJECT_UNAUTHORIZED
+        value: 0
+      - key: PGSSLMODE
+        value: no-verify
