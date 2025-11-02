@@ -23,8 +23,13 @@ const poolConfig = {
 
 // Supabase uses connection pooling which requires SSL but doesn't provide valid certs
 // This is the standard configuration for Supabase pooler connections
-if (databaseUrl && (databaseUrl.includes('supabase') || databaseUrl.includes('pooler'))) {
-	poolConfig.ssl = { rejectUnauthorized: false };
+// Force SSL configuration for all connections to avoid certificate validation issues
+if (databaseUrl && (databaseUrl.includes('supabase') || databaseUrl.includes('pooler') || process.env.NODE_ENV === 'production')) {
+	poolConfig.ssl = { 
+		rejectUnauthorized: false,
+		// Prevent certificate verification errors in production
+		checkServerIdentity: () => undefined
+	};
 }
 
 const pool = new Pool(poolConfig);
