@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import config from '../config';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = config.api.baseUrl;
 
 const TYPE_META = {
   info: { label: 'Info', icon: 'ℹ️', classes: 'bg-slate-100 text-slate-700' },

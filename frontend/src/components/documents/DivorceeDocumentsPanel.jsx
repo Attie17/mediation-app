@@ -4,9 +4,12 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { DOC_TOPICS, TOTAL_DOCS } from './constants';
 import UploadDialog from './UploadDialog';
+import config from '../../config';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../ui/toast';
 import { apiFetch } from '../../lib/apiClient';
+
+const API_BASE_URL = config.api.baseUrl;
 
 // Map latest upload status to our traffic-light status
 // returns { code: 'red' | 'yellow' | 'green', text }
@@ -124,7 +127,7 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
       // Note: apiFetch expects JSON, so we need raw fetch for blob downloads
       // but we can still use the token from apiFetch's bound getter
       const token = localStorage.getItem('auth_token') || '';
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/uploads/${upload.id}/file`, {
+  const res = await fetch(`${API_BASE_URL}/api/uploads/${upload.id}/file`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) throw new Error(`Failed to fetch file (HTTP ${res.status})`);
@@ -141,9 +144,9 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
   return (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
       {/* Left: Progress/topics list */}
-  <Card className="flex flex-col rounded-2xl">
+  <Card className="flex flex-col rounded-2xl bg-slate-800/80 border-slate-700 text-white">
         <CardHeader className="pb-1">
-          <CardTitle className="text-sm font-semibold tracking-wide">Progress</CardTitle>
+          <CardTitle className="text-sm font-semibold tracking-wide text-white">Progress</CardTitle>
         </CardHeader>
         <CardContent className="pt-0 pr-3 flex-1 flex flex-col">
           <div className="flex flex-col gap-0.5 overflow-auto">
@@ -157,7 +160,7 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                   onClick={() => setSelectedTopicKey(t.key)}
                   className={`w-full flex items-center rounded-md px-2 py-1 text-left hover:bg-white/10 ${selectedTopicKey === t.key ? 'bg-white/10' : ''}`}
                 >
-                  <span className="text-[13px] leading-tight font-medium flex items-center gap-1.5 w-full">
+                  <span className="text-[13px] leading-tight font-medium flex items-center gap-1.5 w-full text-slate-100">
                     <span className="truncate max-w-[88px] flex-shrink-0">{t.title}</span>
                     <span className="flex items-center gap-0.5 flex-shrink-0">
                       {(() => {
@@ -178,13 +181,13 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                         ));
                       })()}
                     </span>
-                    <span className="text-[11px] opacity-70 ml-1 tabular-nums flex-shrink-0">{status.greens}/{status.total}</span>
+                    <span className="text-[11px] opacity-70 ml-1 tabular-nums flex-shrink-0 text-slate-300">{status.greens}/{status.total}</span>
                     <span className="flex-1" />
                   </span>
                 </button>
               );
             })}
-            <div className="mt-1 text-[10px] opacity-60 flex items-center gap-2 pl-2 pr-2">
+            <div className="mt-1 text-[10px] opacity-60 flex items-center gap-2 pl-2 pr-2 text-slate-400">
               <span className="flex items-center gap-0.5"><span className="inline-block w-2 h-2 rounded-full bg-blue-400 border border-white/40" /> started</span>
               <span className="flex items-center gap-0.5"><span className="inline-block w-2 h-2 rounded-full bg-green-500 border border-white/40" /> complete</span>
             </div>
@@ -193,13 +196,13 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
       </Card>
 
       {/* Right: Documents for selected topic */}
-  <Card className="flex flex-col rounded-2xl">
+  <Card className="flex flex-col rounded-2xl bg-slate-800/80 border-slate-700 text-white">
         <CardHeader className="pb-1">
-          <CardTitle className="text-sm font-semibold tracking-wide">{selectedTopic.title} — Checklist</CardTitle>
+          <CardTitle className="text-sm font-semibold tracking-wide text-white">{selectedTopic.title} — Checklist</CardTitle>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex flex-col overflow-auto">
           {loading ? (
-            <div className="text-sm opacity-80">Loading documents…</div>
+            <div className="text-sm opacity-80 text-slate-300">Loading documents…</div>
           ) : (
           <div className="flex flex-col divide-y divide-white/10">
             {selectedTopic.docs.map((d) => {
@@ -210,9 +213,9 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
               return (
                 <div key={d.key} className="flex items-center justify-between py-2.5">
                   <div className="pr-2">
-                    <div className="text-[13px] leading-tight font-medium">{d.label}</div>
+                    <div className="text-[13px] leading-tight font-medium text-slate-100">{d.label}</div>
                     {latest && (
-                      <div className="text-[10px] opacity-70 mt-0.5">Last submitted {formatRelativeTime(latest.created_at)}</div>
+                      <div className="text-[10px] opacity-70 mt-0.5 text-slate-400">Last submitted {formatRelativeTime(latest.created_at)}</div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -220,10 +223,22 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                       {!latest ? '❌' : accepted ? '✅' : '⏳'}
                     </span>
                     {latest && (
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleView(latest)}>View</Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 px-2 text-xs bg-slate-700/50 hover:bg-slate-600/70 text-white border border-slate-600" 
+                        onClick={() => handleView(latest)}
+                      >
+                        View
+                      </Button>
                     )}
                     {role === 'divorcee' && (
-                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setDialog({ open: true, docKey: d.key })}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-500 text-white border border-teal-500 font-medium" 
+                        onClick={() => setDialog({ open: true, docKey: d.key })}
+                      >
                         {latest ? 'Replace' : 'Upload'}
                       </Button>
                     )}

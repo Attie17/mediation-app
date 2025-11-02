@@ -7,7 +7,13 @@ export default function SignInForm() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+
+  React.useEffect(() => {
+    if (user?.role) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const onSubmit = async (e) => {
     console.log('SignInForm submit');

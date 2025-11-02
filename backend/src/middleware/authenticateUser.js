@@ -4,6 +4,7 @@ import { validate as isUuid, v5 as uuidv5 } from 'uuid';
 const AUTH_HEADER_NAMES = ['authorization', 'Authorization'];
 
 export function authenticateUser(req, res, next) {
+  console.log('[auth] authenticateUser called', { path: req.path, method: req.method });
   // If devAuth (or another upstream middleware) already set req.user, honor it in dev
   if (req.user) {
     if (process.env.DEV_AUTH_ENABLED === 'true' && process.env.NODE_ENV !== 'production') {
@@ -14,20 +15,25 @@ export function authenticateUser(req, res, next) {
   try {
     const headerKey = AUTH_HEADER_NAMES.find((key) => typeof req.headers[key] === 'string');
     const rawHeader = headerKey ? req.headers[headerKey] : null;
+    console.log('[auth] Authorization header:', rawHeader?.substring(0, 30) + '...');
     if (!rawHeader || !rawHeader.startsWith('Bearer ')) {
+      console.log('[auth] Missing or invalid Authorization header');
       return res.status(401).json({ error: 'Missing or invalid token' });
     }
     const token = rawHeader.replace('Bearer ', '').trim();
     if (!token) return res.status(401).json({ error: 'Missing or invalid token' });
 
-    // Primary: verify with DEV_JWT_SECRET if provided
-    const devSecret = process.env.DEV_JWT_SECRET;
-    if (devSecret) {
+    // Primary: verify with JWT_SECRET or DEV_JWT_SECRET
+    const jwtSecret = process.env.JWT_SECRET || process.env.DEV_JWT_SECRET;
+    if (jwtSecret) {
       try {
-        const payload = jwt.verify(token, devSecret);
+        const payload = jwt.verify(token, jwtSecret);
+        console.log('[auth] JWT payload decoded:', { sub: payload.sub, email: payload.email, role: payload.role });
         req.user = { id: payload.sub, email: payload.email, role: payload.role || 'divorcee' };
+        console.log('[auth] req.user set to:', req.user);
         return next();
       } catch (e) {
+        console.log('[auth] JWT verification failed:', e.message);
         // Fall through to legacy dev-fake token logic or Supabase JWT below
       }
     }
@@ -38,15 +44,25 @@ export function authenticateUser(req, res, next) {
       const devEmail = (req.headers['x-dev-email'] || 'dev@example.com').toString();
       const providedId = (req.headers['x-dev-user-id'] || '').toString();
       const devRole = (req.headers['x-dev-role'] || 'divorcee').toString();
+      console.log('[auth:dev] Headers received:', { 
+        'x-dev-email': devEmail, 
+        'x-dev-user-id': providedId, 
+        'x-dev-role': devRole 
+      });
       const NAMESPACE = '6f8c2b65-9e3f-4f7a-9d3d-2a3d2b1c4d10';
       let devId = providedId;
       if (!isUuid(devId)) {
         devId = uuidv5(devEmail, NAMESPACE);
         if (providedId) {
           console.warn('[auth:dev] Non-UUID x-dev-user-id supplied; derived deterministic v5 from email', { email: devEmail, derived: devId });
+        } else {
+          console.log('[auth:dev] No x-dev-user-id provided; derived deterministic v5 from email', { email: devEmail, derived: devId });
         }
+      } else {
+        console.log('[auth:dev] Using provided x-dev-user-id:', devId);
       }
       req.user = { id: devId, role: devRole, email: devEmail, dev: true };
+      console.log('[auth:dev] Set req.user:', req.user);
       return next();
     }
     // Supabase JWT fallback
@@ -66,3 +82,4 @@ export function authenticateUser(req, res, next) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
+// reload

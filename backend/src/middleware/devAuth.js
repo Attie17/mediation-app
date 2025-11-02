@@ -11,12 +11,22 @@ export default function devAuth(req, _res, next) {
   const namespace = process.env.DEV_AUTH_NAMESPACE || DEFAULT_NS;
   const headerId = req.header('x-dev-user-id');
   const email = req.header('x-dev-email');
-  const role = req.header('x-dev-role') || 'divorcee';
+  const role = req.header('x-dev-role'); // Don't default to anything
+
+  console.log('[devAuth] Headers:', { headerId, email, role, isValidUuid: isUuid(headerId || '') });
 
   if (!headerId && !email) return next(); // no dev identity provided
+  if (!role) return next(); // no role specified, skip devAuth (let real auth handle it)
 
-  const userId = isUuid(headerId || '') ? headerId : uuidv5(String(email || 'dev@example.com'), namespace);
+  // If headerId is provided and matches UUID format (even if it's a test UUID like 22222222-...), use it
+  // Otherwise generate deterministic UUID from email
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const userId = (headerId && uuidRegex.test(headerId)) ? headerId : uuidv5(String(email || 'dev@example.com'), namespace);
+  console.log('[devAuth] Computed userId:', userId, 'from', (headerId && uuidRegex.test(headerId)) ? 'headerId' : 'email');
   const name = req.header('x-dev-name') || email?.split('@')[0] || 'Dev User';
   req.user = { id: userId, email: email || 'dev@example.com', role, name, dev: true };
+  console.log('[devAuth] Set req.user:', req.user);
   return next();
 }
+// reload
+// reload

@@ -10,6 +10,14 @@ const VALID_ROLES = new Set(["mediator", "divorcee"]);
 const getCaseIdFromRequest = (req) => {
   const segments = req.baseUrl?.split("/") || [];
   const caseIdSegment = segments.length >= 2 ? segments[segments.length - 2] : null;
+  
+  // Check if it's a UUID (standard format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  if (caseIdSegment && uuidPattern.test(caseIdSegment)) {
+    return caseIdSegment;
+  }
+  
+  // Fallback to numeric ID for legacy support
   const parsed = Number(caseIdSegment);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
@@ -91,8 +99,8 @@ async function resolveInviteTarget({ userId, email }) {
     if (normalizedUserId) {
       const { data, error } = await supabase
         .from("app_users")
-        .select("id, email")
-        .eq("id", normalizedUserId)
+        .select("user_id, email")
+        .eq("user_id", normalizedUserId)
         .maybeSingle();
 
       if (error) {
@@ -108,12 +116,12 @@ async function resolveInviteTarget({ userId, email }) {
         return { status: 400, body: { error: "Provided userId and email refer to different users." } };
       }
 
-      return { status: 200, payload: { userId: data.id, email: data.email } };
+      return { status: 200, payload: { userId: data.user_id, email: data.email } };
     }
 
     const { data, error } = await supabase
       .from("app_users")
-      .select("id, email")
+      .select("user_id, email")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -126,7 +134,7 @@ async function resolveInviteTarget({ userId, email }) {
       return { status: 404, body: { error: `User with email "${normalizedEmail}" not found.` } };
     }
 
-    return { status: 200, payload: { userId: data.id, email: data.email } };
+    return { status: 200, payload: { userId: data.user_id, email: data.email } };
   } catch (err) {
     console.error("Unexpected error resolving invite target:", err);
     return { status: 500, body: { error: "Failed to look up user information" } };

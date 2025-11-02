@@ -7,9 +7,6 @@ export function roleToPath(role) {
     : '/lawyer';
 }
 
-// Minimal session/profile using AuthContext fallback
-import supabase from './supabase';
-
 export async function getSessionAndProfile() {
   try {
     const token = localStorage.getItem('token');

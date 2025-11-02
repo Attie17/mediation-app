@@ -6,13 +6,12 @@ import { Button } from './ui/button';
 export default function LogoutButton({ className = '' }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const handleLogout = async () => {
-    try {
-      await Promise.resolve(logout());
-    } finally {
-      navigate('/', { replace: true });
-    }
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/', { replace: true });
   };
+  
   return (
     <Button 
       variant="outline" 

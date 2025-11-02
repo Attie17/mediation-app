@@ -26,7 +26,8 @@ export default function RegisterForm() {
       if (password !== confirmPassword) throw new Error('Passwords do not match');
       
       await authRegister(email, password, name, role);
-      navigate('/dashboard');
+      // Redirect to role setup to complete profile
+      navigate(`/setup?role=${role || 'divorcee'}`);
     } catch (err) {
       console.error('[RegisterForm] Error:', err);
       const msg = err?.data?.error?.message || err.message || 'Registration failed';
@@ -70,17 +71,18 @@ export default function RegisterForm() {
           <input
             type="password"
             name="password"
-            placeholder="Password (min 6 characters)"
+            placeholder="Password (min 8 chars, upper/lower/digit/special)"
             className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
-            minLength={6}
+            minLength={8}
             required
+            title="Password must be at least 8 characters with uppercase, lowercase, number, and special character (@$!%*?&#)"
           />
           <input
             type="password"
             name="confirmPassword"
             placeholder="Confirm password"
             className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
-            minLength={6}
+            minLength={8}
             required
           />
           {error && (

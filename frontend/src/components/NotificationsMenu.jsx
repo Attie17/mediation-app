@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import config from '../config';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = config.api.baseUrl;
 
 const formatTimestamp = (value) => {
   if (!value) return 'Just now';

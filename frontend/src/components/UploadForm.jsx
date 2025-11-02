@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import StatusCell from './StatusCell';
+import config from '../config';
+
+const API_BASE_URL = config.api.baseUrl;
 
 const UploadForm = () => {
 
@@ -21,7 +24,7 @@ const UploadForm = () => {
       return;
     }
     try {
-      const res = await fetch('http://localhost:4000/uploads', {
+  const res = await fetch(`${API_BASE_URL}/uploads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

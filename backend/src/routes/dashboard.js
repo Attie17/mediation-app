@@ -1,12 +1,24 @@
 import express from 'express';
 import { supabase, requireSupabaseOr500 } from '../lib/supabaseClient.js';
+import { authenticateUser } from '../middleware/authenticateUser.js';
 
 const router = express.Router();
 router.use((req,res,next)=>{ if(!supabase) return requireSupabaseOr500(res); next(); });
 
-// Simple test endpoint to verify dashboard routes work
-router.get('/test', async (req, res) => {
-  res.json({ message: 'Dashboard routes are working!', timestamp: new Date() });
+// Log ALL requests to dashboard routes
+router.use((req, res, next) => {
+  console.log(`🟢 DASHBOARD ROUTER - ${req.method} ${req.url}`);
+  console.log('🟢 req.user before auth:', req.user);
+  next();
+});
+
+// All dashboard routes require authenticated users
+router.use(authenticateUser);
+
+// Log AFTER authentication
+router.use((req, res, next) => {
+  console.log(`🟡 AFTER AUTH - req.user:`, req.user);
+  next();
 });
 
 // Simple test endpoint to verify dashboard routes work
@@ -247,176 +259,6 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-// GET /cases/:caseId/dashboard - comprehensive case dashboard data
-router.get('/cases/:caseId/dashboard', async (req, res) => {
-  try {
-    const { caseId } = req.params;
-    const { userId, userRole } = req.query; // In real app, this would come from auth middleware
-    
-    // Validate caseId is an integer
-    const caseIdInt = parseInt(caseId, 10);
-    if (isNaN(caseIdInt) || caseIdInt <= 0) {
-      return res.status(400).json({ 
-        error: 'Invalid case ID. Must be a positive integer.' 
-      });
-    }
-
-    console.log(`📊 Fetching dashboard data for case ID: ${caseIdInt}, user: ${userId}, role: ${userRole}`);
-    
-    // 1. Fetch case details
-    const { data: caseData, error: caseError } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('id', caseIdInt)
-      .single();
-
-    if (caseError) {
-      console.error('Error fetching case:', caseError);
-      return res.status(500).json({ error: caseError.message });
-    }
-
-    if (!caseData) {
-      return res.status(404).json({ error: 'Case not found' });
-    }
-
-    // 2. Fetch participants (without joins to avoid schema issues)
-    let participants = [];
-    try {
-      const { data: participantsData, error: participantsError } = await supabase
-        .from('case_participants')
-        .select('*')
-        .eq('case_id', caseIdInt);
-
-      if (participantsError) {
-        console.log('📝 case_participants table may not exist yet, continuing without participants data');
-      } else {
-        participants = participantsData || [];
-      }
-    } catch (err) {
-      console.log('📝 Participants table not accessible, continuing without participants data');
-    }
-
-    // 3. Fetch case requirements
-    const { data: requirements, error: requirementsError } = await supabase
-      .from('case_requirements')
-      .select('*')
-      .eq('case_id', caseIdInt)
-      .order('created_at', { ascending: true });
-
-    if (requirementsError) {
-      console.error('Error fetching requirements:', requirementsError);
-      return res.status(500).json({ error: requirementsError.message });
-    }
-
-    // 4. Fetch uploads (without complex joins to avoid schema cache issues)
-    let uploadsQuery = supabase
-      .from('uploads')
-      .select('*')
-      .eq('case_id', caseIdInt)
-      .order('created_at', { ascending: false });
-
-    // If user is a divorcee, only show their uploads
-    if (userRole === 'divorcee' && userId) {
-      uploadsQuery = uploadsQuery.eq('user_id', userId);
-    }
-
-    const { data: uploads, error: uploadsError } = await uploadsQuery;
-
-    if (uploadsError) {
-      console.error('Error fetching uploads:', uploadsError);
-      return res.status(500).json({ error: uploadsError.message });
-    }
-
-    // 5. Process requirements with upload status
-    const requirementsWithStatus = (requirements || []).map(requirement => {
-      // Find uploads for this document type
-      const docUploads = uploads?.filter(upload => upload.doc_type === requirement.doc_type) || [];
-      
-      let status = 'missing';
-      let latestUpload = null;
-
-      if (docUploads.length > 0) {
-        // Get the latest upload for this doc type
-        latestUpload = docUploads[0]; // Already ordered by created_at desc
-        
-        switch (latestUpload.status) {
-          case 'confirmed':
-            status = 'confirmed';
-            break;
-          case 'rejected':
-            status = 'rejected';
-            break;
-          case 'pending':
-          default:
-            status = 'uploaded';
-            break;
-        }
-      }
-
-      return {
-        ...requirement,
-        status,
-        latestUpload
-      };
-    });
-
-    // 6. Group uploads by document type (latest version of each)
-    const uploadsByDocType = {};
-    uploads?.forEach(upload => {
-      if (!uploadsByDocType[upload.doc_type] || 
-          new Date(upload.created_at) > new Date(uploadsByDocType[upload.doc_type].created_at)) {
-        uploadsByDocType[upload.doc_type] = upload;
-      }
-    });
-
-    const processedUploads = Object.values(uploadsByDocType);
-
-    const dashboardData = {
-      case: {
-        id: caseData.id,
-        title: caseData.title || `Case #${caseData.id}`,
-        created_at: caseData.created_at,
-        description: caseData.description
-      },
-      participants: participants?.map(p => ({
-        id: p.id,
-        user_id: p.user_id,
-        role: p.role,
-        created_at: p.created_at,
-        user: {
-          id: p.user_id,
-          email: 'Unknown', // We'll fetch this separately if needed
-          full_name: 'Unknown User'
-        }
-      })) || [],
-      requirements: requirementsWithStatus,
-      uploads: processedUploads || [],
-      stats: {
-        totalRequirements: requirements?.length || 0,
-        confirmedCount: requirementsWithStatus.filter(r => r.status === 'confirmed').length,
-        rejectedCount: requirementsWithStatus.filter(r => r.status === 'rejected').length,
-        uploadedCount: requirementsWithStatus.filter(r => r.status === 'uploaded').length,
-        missingCount: requirementsWithStatus.filter(r => r.status === 'missing').length,
-        totalParticipants: participants?.length || 0,
-        totalUploads: processedUploads?.length || 0
-      }
-    };
-
-    console.log(`📊 Dashboard data compiled:`, {
-      caseId: caseIdInt,
-      participants: dashboardData.participants.length,
-      requirements: dashboardData.requirements.length,
-      uploads: dashboardData.uploads.length
-    });
-    
-    return res.json(dashboardData);
-    
-  } catch (err) {
-    console.error('Dashboard route error:', err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
 // ============================================
 // ROLE-SPECIFIC DASHBOARD STATS ENDPOINTS
 // ============================================
@@ -435,42 +277,67 @@ router.get('/stats/admin', async (req, res) => {
   try {
     console.log('📊 Fetching admin dashboard stats');
 
-    // Get total users count
-    const { data: usersData, error: usersError } = await supabase
+    // Get total users count with role breakdown
+    const { data: usersData, error: usersError, count: totalUsersCount } = await supabase
       .from('app_users')
-      .select('user_id', { count: 'exact', head: true });
+      .select('role', { count: 'exact' });
 
     if (usersError) {
       console.error('Error counting users:', usersError);
       return res.status(500).json({ error: usersError.message });
     }
 
-    // Get active cases count (assuming status field exists)
-    const { data: activeCasesData, error: activeCasesError, count: activeCasesCount } = await supabase
+    // Calculate role breakdown
+    const roleBreakdown = {
+      divorcee: 0,
+      mediator: 0,
+      lawyer: 0,
+      admin: 0
+    };
+
+    if (usersData) {
+      usersData.forEach(user => {
+        const role = user.role?.toLowerCase();
+        if (roleBreakdown.hasOwnProperty(role)) {
+          roleBreakdown[role]++;
+        }
+      });
+    }
+
+    // Get all cases count
+    const { count: totalCasesCount, error: totalCasesError } = await supabase
+      .from('cases')
+      .select('id', { count: 'exact', head: true });
+
+    if (totalCasesError) {
+      console.error('Error counting total cases:', totalCasesError);
+    }
+
+    // Get active cases count (open or in_progress status)
+    const { count: activeCasesCount, error: activeCasesError } = await supabase
       .from('cases')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'active');
+      .in('status', ['open', 'in_progress', 'active']);
 
     if (activeCasesError) {
       console.error('Error counting active cases:', activeCasesError);
-      // Continue anyway, will return 0
     }
 
     // Get resolved cases count
-    const { data: resolvedCasesData, error: resolvedCasesError, count: resolvedCasesCount } = await supabase
+    const { count: resolvedCasesCount, error: resolvedCasesError } = await supabase
       .from('cases')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'resolved');
+      .in('status', ['resolved', 'completed', 'closed']);
 
     if (resolvedCasesError) {
       console.error('Error counting resolved cases:', resolvedCasesError);
     }
 
-    // Get pending invites count (if invites table exists)
+    // Get pending invites count (if case_participants with pending status exist)
     let pendingInvitesCount = 0;
     try {
       const { count: invitesCount, error: invitesError } = await supabase
-        .from('invites')
+        .from('case_participants')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending');
 
@@ -478,14 +345,48 @@ router.get('/stats/admin', async (req, res) => {
         pendingInvitesCount = invitesCount || 0;
       }
     } catch (err) {
-      console.log('Invites table may not exist, continuing with 0');
+      console.log('Pending invites query failed, using 0');
+    }
+
+    // Calculate average case duration for resolved cases
+    let avgCaseDuration = 0;
+    try {
+      const { data: resolvedCases, error: durationError } = await supabase
+        .from('cases')
+        .select('created_at, updated_at, closed_at')
+        .in('status', ['resolved', 'completed', 'closed'])
+        .limit(100);
+
+      if (!durationError && resolvedCases && resolvedCases.length > 0) {
+        let totalDays = 0;
+        let validCount = 0;
+
+        resolvedCases.forEach(c => {
+          const start = new Date(c.created_at);
+          const end = new Date(c.closed_at || c.updated_at);
+          const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0) {
+            totalDays += diffDays;
+            validCount++;
+          }
+        });
+
+        if (validCount > 0) {
+          avgCaseDuration = Math.round(totalDays / validCount);
+        }
+      }
+    } catch (err) {
+      console.log('Case duration calculation failed, using 0');
     }
 
     const stats = {
-      totalUsers: usersData?.length || 0,
+      totalUsers: totalUsersCount || 0,
       activeCases: activeCasesCount || 0,
       resolvedCases: resolvedCasesCount || 0,
-      pendingInvites: pendingInvitesCount
+      totalCases: totalCasesCount || 0,
+      pendingInvites: pendingInvitesCount,
+      roleBreakdown,
+      avgCaseDuration
     };
 
     console.log('✅ Admin stats:', stats);
@@ -536,22 +437,26 @@ router.get('/stats/mediator/:userId', async (req, res) => {
       console.log('review_status field may not exist, using 0');
     }
 
-    // Get today's sessions (if sessions table exists)
+    // Get today's sessions (count mediation sessions scheduled for today)
     let todaySessionsCount = 0;
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
+
       const { count, error } = await supabase
-        .from('sessions')
+        .from('mediation_sessions')
         .select('id', { count: 'exact', head: true })
         .eq('mediator_id', userId)
-        .gte('session_date', today)
-        .lt('session_date', new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+        .eq('session_date', todayString)
+        .not('status', 'eq', 'cancelled');
 
       if (!error) {
         todaySessionsCount = count || 0;
+      } else {
+        console.log('Error counting today sessions, using 0', error.message);
       }
     } catch (err) {
-      console.log('Sessions table may not exist, using 0');
+      console.log('mediation_sessions table lookup failed, using 0');
     }
 
     // Get resolved this month
@@ -686,20 +591,24 @@ router.get('/stats/lawyer/:userId', async (req, res) => {
  * Returns divorcee-specific statistics
  */
 router.get('/stats/divorcee/:userId', async (req, res) => {
+  console.log('🔵 DIVORCEE STATS ROUTE HIT - START');
+  console.log('🔵 req.user:', req.user);
+  console.log('🔵 req.params:', req.params);
+  
   try {
     const { userId } = req.params;
     console.log(`📊 Fetching divorcee stats for user: ${userId}`);
 
-    // Get user's case
-    const { data: caseData, error: caseError } = await supabase
+    // Get user's case (step 1: get case_id from case_participants)
+    const { data: caseParticipant, error: caseError } = await supabase
       .from('case_participants')
-      .select('case_id, case_status')
+      .select('case_id')
       .eq('user_id', userId)
       .eq('role', 'divorcee')
       .limit(1)
       .single();
 
-    if (caseError || !caseData) {
+    if (caseError || !caseParticipant) {
       console.log('No case found for divorcee');
       return res.json({
         ok: true,
@@ -712,7 +621,16 @@ router.get('/stats/divorcee/:userId', async (req, res) => {
       });
     }
 
-    const caseId = caseData.case_id;
+    const caseId = caseParticipant.case_id;
+
+    // Get case status from cases table (step 2: get status)
+    const { data: caseInfo, error: caseInfoError } = await supabase
+      .from('cases')
+      .select('status')
+      .eq('id', caseId)
+      .single();
+
+    const caseStatus = caseInfo?.status || 'active';
 
     // Get documents uploaded by this user
     const { count: documentsUploadedCount, error: uploadedError } = await supabase
@@ -754,7 +672,7 @@ router.get('/stats/divorcee/:userId', async (req, res) => {
     }
 
     const stats = {
-      caseStatus: caseData.case_status || 'active',
+      caseStatus: caseStatus,
       documentsUploaded: documentsUploadedCount || 0,
       documentsPending: documentsPendingCount || 0,
       unreadMessages: unreadMessagesCount

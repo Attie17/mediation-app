@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clear Storage</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 100px auto;
+      padding: 20px;
+      background: #1e293b;
+      color: #e2e8f0;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #dc2626;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #b91c1c;
+    }
+    .success {
+      background: #059669;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 20px;
+      display: none;
+    }
+    .info {
+      background: #334155;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 20px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧹 Clear Browser Storage</h1>
+  <p>This will clear all localStorage items for this app.</p>
+  
+  <div class="info" id="current">
+    <strong>Current localStorage:</strong><br>
+    <div id="items"></div>
+  </div>
+  
+  <button onclick="clearAll()">Clear All Storage</button>
+  <button onclick="location.href='/'">Go to Home</button>
+  
+  <div class="success" id="success">
+    ✅ Storage cleared! Click "Go to Home" to start fresh.
+  </div>
+  
+  <script>
+    function showCurrent() {
+      const items = document.getElementById('items');
+      const keys = Object.keys(localStorage);
+      if (keys.length === 0) {
+        items.innerHTML = '<em style="color: #94a3b8;">Empty</em>';
+      } else {
+        items.innerHTML = keys.map(key => 
+          `${key}: ${localStorage.getItem(key).substring(0, 50)}...`
+        ).join('<br>');
+      }
+    }
+    
+    function clearAll() {
+      localStorage.clear();
+      document.getElementById('success').style.display = 'block';
+      showCurrent();
+    }
+    
+    showCurrent();
+  </script>
+</body>
+</html>

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import config from '../config';
+
+const API_BASE_URL = config.api.baseUrl;
 
 export default function RegisterForm() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,16 +17,18 @@ export default function RegisterForm() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:4000/auth/register', {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, name }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (res.ok && data.ok) {
         navigate('/login');
       } else {
-        setError(data.error || 'Registration failed');
+        const apiError = data?.error;
+        const message = typeof apiError === 'string' ? apiError : apiError?.message;
+        setError(message || 'Registration failed');
       }
     } catch (err) {
       setError('Network error');
@@ -32,6 +38,16 @@ export default function RegisterForm() {
 
   return (
     <form className="max-w-sm mx-auto p-4 border rounded shadow" onSubmit={handleSubmit}>
+      <div className="mb-4">
+        <label className="block mb-1">Name</label>
+        <input
+          type="text"
+          className="w-full border px-3 py-2 rounded"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          required
+        />
+      </div>
       <div className="mb-4">
         <label className="block mb-1">Email</label>
         <input
@@ -67,7 +83,7 @@ export default function RegisterForm() {
 // Requirements:
 // - Inputs: email, password
 // - Submit button: "Register"
-// - On submit, call POST http://localhost:4000/auth/register with email + password
+// - On submit, call POST {API_BASE_URL}/auth/register with email + password
 // - If registration succeeds, redirect to /login
 // - If error, show error message in red below the form
 // - Use useState for email, password, loading, and error state

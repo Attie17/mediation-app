@@ -33,6 +33,27 @@ import advancedAIService from '../services/advancedAIService.js';
 
 const router = express.Router();
 
+// Helper functions for health checks
+async function checkDatabaseHealth() {
+  try {
+    const result = await pool.query('SELECT 1');
+    return result.rowCount === 1;
+  } catch (error) {
+    console.error('[DB Health] Error:', error.message);
+    return false;
+  }
+}
+
+async function checkModelHealth() {
+  try {
+    // Check if OpenAI API key is configured
+    return !!process.env.OPENAI_API_KEY;
+  } catch (error) {
+    console.error('[Model Health] Error:', error.message);
+    return false;
+  }
+}
+
 // Apply authentication to all routes
 router.use(authenticateUser);
 

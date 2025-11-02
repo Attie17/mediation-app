@@ -9,6 +9,16 @@ export default function ProfileSetup() {
   const navigate = useNavigate();
   const displayName = user?.preferredName || user?.name || 'there';
 
+  const addressValue = React.useMemo(() => {
+    const addr = user?.address;
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr;
+    if (typeof addr === 'object') {
+      return addr.line1 || addr.street || addr.address || '';
+    }
+    return '';
+  }, [user?.address]);
+
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -23,7 +33,7 @@ export default function ProfileSetup() {
       const phone = (data.get('phone') || '').toString().trim();
       const addressRaw = (data.get('address') || '').toString().trim();
       const role = (data.get('role') || user?.role || 'divorcee').toString();
-      const address = addressRaw ? { line1: addressRaw } : {};
+      const address = addressRaw ? { line1: addressRaw } : null;
       await updateUser({ name: fullName, preferredName, phone, address, role });
       navigate('/dashboard');
     } catch (err) {
@@ -41,7 +51,7 @@ export default function ProfileSetup() {
           <input name="fullName" type="text" placeholder="Full names" defaultValue={user?.name || ''} className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white" />
           <input name="preferredName" type="text" placeholder="How would you like us to address you?" defaultValue={user?.preferredName || ''} className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white" />
           <input name="phone" type="tel" placeholder="Phone" defaultValue={user?.phone || ''} className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white" />
-          <input name="address" type="text" placeholder="Address" defaultValue={user?.address || ''} className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white" />
+          <input name="address" type="text" placeholder="Address" defaultValue={addressValue} className="w-full rounded-md px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white" />
           <select name="role" defaultValue={user?.role || 'divorcee'} className="w-full rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-white">
             <option value="mediator">Mediator</option>
             <option value="divorcee">Divorcee</option>

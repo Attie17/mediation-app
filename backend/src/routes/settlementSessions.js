@@ -1,6 +1,17 @@
 import { Router } from 'express';
+import { supabase, requireSupabaseOr500 } from '../lib/supabaseClient.js';
+import { authenticateUser } from '../middleware/authenticateUser.js';
 
 const router = Router();
+
+// Ensure supabase client is configured before handling requests
+router.use((req, res, next) => {
+  if (!supabase) return requireSupabaseOr500(res);
+  return next();
+});
+
+// All settlement session routes require authentication
+router.use(authenticateUser);
 
 // Create a new settlement session
 router.post('/', async (req, res) => {
@@ -18,7 +29,7 @@ router.post('/', async (req, res) => {
     // Generate session ID
     const sessionId = `DW-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
 
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('settlement_sessions')
       .insert({
         id: sessionId,
@@ -50,7 +61,7 @@ router.get('/case/:caseId', async (req, res) => {
   try {
     const { caseId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('settlement_sessions')
       .select(`
         *,
@@ -77,7 +88,7 @@ router.get('/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('settlement_sessions')
       .select(`
         *,
@@ -106,7 +117,7 @@ router.patch('/:sessionId/status', async (req, res) => {
     const { sessionId } = req.params;
     const { status } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('settlement_sessions')
       .update({ status })
       .eq('id', sessionId)
@@ -131,7 +142,7 @@ router.patch('/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     const updates = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('settlement_sessions')
       .update(updates)
       .eq('id', sessionId)
@@ -156,7 +167,7 @@ router.post('/:sessionId/form-section', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, section_data, party_id } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_form_sections')
       .upsert({
         session_id: sessionId,
@@ -185,7 +196,7 @@ router.get('/:sessionId/form-sections', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_form_sections')
       .select('*')
       .eq('session_id', sessionId);
@@ -207,7 +218,7 @@ router.get('/:sessionId/sections', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_form_sections')
       .select('*')
       .eq('session_id', sessionId);
@@ -230,7 +241,7 @@ router.post('/:sessionId/sections', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, form_data } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_form_sections')
       .upsert({
         session_id: sessionId,
@@ -260,7 +271,7 @@ router.post('/:sessionId/approve', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, party_id } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_approvals')
       .upsert({
         session_id: sessionId,
@@ -290,7 +301,7 @@ router.post('/:sessionId/approvals', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, party, approved, notes } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_approvals')
       .upsert({
         session_id: sessionId,
@@ -321,7 +332,7 @@ router.get('/:sessionId/approvals', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_approvals')
       .select('*')
       .eq('session_id', sessionId);
@@ -344,7 +355,7 @@ router.post('/:sessionId/conflict', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, party_id, conflict_details } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_conflicts')
       .insert({
         session_id: sessionId,
@@ -374,7 +385,7 @@ router.post('/:sessionId/conflicts', async (req, res) => {
     const { sessionId } = req.params;
     const { section_name, conflict_reason, party1_position, party2_position } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_conflicts')
       .insert({
         session_id: sessionId,
@@ -404,7 +415,7 @@ router.get('/:sessionId/conflicts', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('section_conflicts')
       .select('*')
       .eq('session_id', sessionId);
@@ -427,7 +438,7 @@ router.post('/:sessionId/chat', async (req, res) => {
     const { sessionId } = req.params;
     const { message, sender_id } = req.body;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_chat_logs')
       .insert({
         session_id: sessionId,
@@ -455,7 +466,7 @@ router.get('/:sessionId/chat', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    const { data, error } = await req.supabase
+  const { data, error } = await supabase
       .from('session_chat_logs')
       .select(`
         *,

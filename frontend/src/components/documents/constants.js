@@ -1,6 +1,13 @@
 // Canonical required documents grouped into topics (16 total)
 export const DOC_TOPICS = [
   {
+    key: 'intake',
+    title: 'Intake',
+    docs: [
+      { key: 'intake_form', label: 'Completed Intake Form' },
+    ],
+  },
+  {
     key: 'profile',
     title: 'Profile',
     docs: [
@@ -14,13 +21,6 @@ export const DOC_TOPICS = [
     docs: [
       { key: 'child_birth_certificates', label: 'Birth Certificates (if applicable)' },
       { key: 'school_fees_proof', label: 'Proof of School Fees' },
-    ],
-  },
-  {
-    key: 'intake',
-    title: 'Intake',
-    docs: [
-      { key: 'intake_form', label: 'Completed Intake Form' },
     ],
   },
   {

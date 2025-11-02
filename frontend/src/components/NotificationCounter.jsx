@@ -1,7 +1,8 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import config from '../config';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = config.api.baseUrl;
 
 const NotificationCounter = forwardRef(({ onCountChange }, ref) => {
   const { session } = useAuth();

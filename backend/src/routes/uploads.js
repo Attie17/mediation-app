@@ -10,10 +10,10 @@ router.use((req,res,next)=>{ if(!supabase) return requireSupabaseOr500(res); nex
 
 router.use(authenticateUser);
 
-const APP_USERS_DEFAULT_SELECT = 'id, email, name, role';
+const APP_USERS_DEFAULT_SELECT = 'user_id, email, name, role';
 
 const normalizeAppUser = (row = {}) => ({
-  id: row.id || null,
+  id: row.user_id || row.id || null,
   email: row.email ?? null,
   name: row.name ?? null,
   role: row.role ?? null,
@@ -32,14 +32,14 @@ async function fetchAppUsersByIds(userIds = []) {
   let response = await supabase
     .from('app_users')
     .select(APP_USERS_DEFAULT_SELECT)
-    .in('id', uniqueIds);
+    .in('user_id', uniqueIds);
 
   if (response.error) {
     if (response.error.code === '42703') {
       const fallback = await supabase
         .from('app_users')
-        .select('id, role')
-        .in('id', uniqueIds);
+        .select('user_id, role')
+        .in('user_id', uniqueIds);
       if (fallback.error) {
         console.error('App users fallback fetch error:', fallback.error);
         return [];
@@ -60,15 +60,15 @@ async function fetchAppUserById(userId) {
   let response = await supabase
     .from('app_users')
     .select(APP_USERS_DEFAULT_SELECT)
-    .eq('id', userId)
+    .eq('user_id', userId)
     .single();
 
   if (response.error) {
     if (response.error.code === '42703') {
       const fallback = await supabase
         .from('app_users')
-        .select('id, role')
-        .eq('id', userId)
+        .select('user_id, role')
+        .eq('user_id', userId)
         .single();
       if (fallback.error) {
         console.error('App user fallback fetch error:', fallback.error);
@@ -246,6 +246,60 @@ function formatDocTypeForNotification(docType) {
   };
   return labels[docType] || docType.replace(/_/g, " ");
 }
+
+// GET /api/uploads/mediator/:userId/pending - Get all pending uploads for a mediator across all their cases
+router.get('/mediator/:userId/pending', async (req, res) => {
+  const { userId } = req.params;
+  const requestingUserId = req.user?.id;
+
+  // Verify requesting user is the mediator
+  if (requestingUserId !== userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    // Get all cases where this user is a mediator
+    const casesResult = await pool.query(
+      `SELECT id as case_id
+       FROM cases
+       WHERE mediator_id = $1`,
+      [userId]
+    );
+
+    if (casesResult.rows.length === 0) {
+      return res.json({ uploads: [] });
+    }
+
+  const caseIds = casesResult.rows.map(row => row.case_id);
+  console.log('[uploads] mediator pending - caseIds:', caseIds);
+
+  const caseIdTypes = caseIds.map(id => ({ id, type: typeof id }));
+  console.log('[uploads] mediator pending - caseId types:', caseIdTypes);
+
+    // Get all pending uploads for these cases
+  console.log('[uploads] mediator pending - executing pending uploads query');
+
+  const uploadsResult = await pool.query(
+      `SELECT u.id, u.case_uuid as case_id, u.user_id, u.doc_type, u.original_filename, 
+              u.storage_path, u.status, u.uploaded_at, u.created_at,
+              au.email as uploader_email, au.name as uploader_name
+       FROM uploads u
+       LEFT JOIN app_users au ON u.user_id = au.user_id
+       WHERE u.case_uuid = ANY($1::uuid[])
+         AND u.status = 'pending'
+       ORDER BY u.uploaded_at DESC
+       LIMIT 50`,
+      [caseIds]
+    );
+
+  console.log('[uploads] mediator pending - query rows:', uploadsResult.rows?.length || 0);
+
+  return res.json({ uploads: uploadsResult.rows });
+  } catch (error) {
+    console.error('Error fetching mediator pending uploads:', error);
+    return res.status(500).json({ error: 'Failed to fetch pending uploads' });
+  }
+});
 
 // GET /api/uploads/:uploadId/versions : fetch all versions for an upload
 router.get('/:uploadId/versions', async (req, res) => {
@@ -559,18 +613,21 @@ router.post('/file', upload.single('document'), async (req, res) => {
   try {
     const userId = req.user?.id;
     const docType = req.body.doc_type;
+    const caseId = req.body.case_id || null; // Accept case_id from request
+    
     if (!userId || !docType || !req.file) {
       return res.status(400).json({ error: 'Missing userId, docType, or file.' });
     }
     const filePath = `/${req.file.path.replace(/\\/g, '/')}`;
     
     // Insert upload record
-    console.log('Inserting upload record for user:', userId, 'docType:', docType);
+    console.log('Inserting upload record for user:', userId, 'docType:', docType, 'caseId:', caseId);
     const { data: uploadData, error: uploadError } = await supabase
       .from('uploads')
       .insert([
         {
           user_id: userId,
+          case_id: caseId, // Include case_id
           doc_type: docType,
           file_name: req.file.filename,
           file_path: filePath,
@@ -629,8 +686,23 @@ router.post('/file', upload.single('document'), async (req, res) => {
 });
 // Access control middleware
 function canListUploads(req, res, next) {
-  if (req.user?.role === 'mediator') return next();
-  if (req.user?.role === 'divorcee' && req.query.userId && Number(req.query.userId) === req.user.id) return next();
+  console.log('[uploads:canListUploads] checking permission', { 
+    userId: req.user?.id, 
+    role: req.user?.role, 
+    queryUserId: req.query.userId 
+  });
+  
+  if (req.user?.role === 'mediator') {
+    console.log('[uploads:canListUploads] ✅ mediator access granted');
+    return next();
+  }
+  
+  if (req.user?.role === 'divorcee' && req.query.userId && Number(req.query.userId) === req.user.id) {
+    console.log('[uploads:canListUploads] ✅ divorcee access granted (own uploads)');
+    return next();
+  }
+  
+  console.log('[uploads:canListUploads] ❌ access denied');
   return res.status(403).json({ error: 'Forbidden' });
 }
 
@@ -1244,6 +1316,210 @@ router.delete('/:id', canConfirmUpload, async (req, res) => {
   } catch (err) {
     console.error('Delete route error:', err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/uploads/pending - Get all pending uploads (for mediators/admins)
+router.get('/pending', async (req, res) => {
+  try {
+    const userRole = req.user?.role;
+    const userId = req.user?.id || req.user?.user_id;
+
+    // Only mediators and admins can view pending uploads
+    if (userRole !== 'mediator' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Mediator or Admin access required' });
+    }
+
+    let query = supabase
+      .from('uploads')
+      .select(`
+        id,
+        case_id,
+        case_uuid,
+        user_id,
+        doc_type,
+        original_filename,
+        storage_path,
+        status,
+        uploaded_at,
+        created_at,
+        updated_at,
+        notes,
+        app_users!uploads_user_id_fkey (
+          user_id,
+          email,
+          full_name,
+          role
+        ),
+        cases (
+          id,
+          title,
+          status
+        )
+      `)
+      .eq('status', 'pending')
+      .order('uploaded_at', { ascending: false })
+      .limit(100);
+
+    // If mediator, filter by their assigned cases
+    if (userRole === 'mediator') {
+      const { data: mediatorCases, error: casesError } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('mediator_id', userId);
+
+      if (casesError) {
+        console.error('Error fetching mediator cases:', casesError);
+        return res.status(500).json({ error: 'Failed to fetch cases' });
+      }
+
+      if (mediatorCases.length === 0) {
+        return res.json({ uploads: [] });
+      }
+
+      const caseIds = mediatorCases.map(c => c.id);
+      query = query.in('case_uuid', caseIds);
+    }
+
+    const { data: uploads, error } = await query;
+
+    if (error) {
+      console.error('Error fetching pending uploads:', error);
+      return res.status(500).json({ error: 'Failed to fetch pending uploads' });
+    }
+
+    // Transform data
+    const transformedUploads = uploads.map(upload => ({
+      id: upload.id,
+      case_id: upload.case_uuid || upload.case_id,
+      user_id: upload.user_id,
+      doc_type: upload.doc_type,
+      original_filename: upload.original_filename,
+      storage_path: upload.storage_path,
+      status: upload.status,
+      uploaded_at: upload.uploaded_at,
+      created_at: upload.created_at,
+      updated_at: upload.updated_at,
+      notes: upload.notes,
+      uploader: upload.app_users ? {
+        user_id: upload.app_users.user_id,
+        email: upload.app_users.email,
+        full_name: upload.app_users.full_name,
+        role: upload.app_users.role
+      } : null,
+      case: upload.cases ? {
+        id: upload.cases.id,
+        title: upload.cases.title,
+        status: upload.cases.status
+      } : null
+    }));
+
+    return res.json({
+      success: true,
+      uploads: transformedUploads,
+      count: transformedUploads.length
+    });
+
+  } catch (err) {
+    console.error('Pending uploads route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/uploads/:id/review - Review (approve/reject) an upload
+router.patch('/:id/review', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body; // action: 'approve' or 'reject'
+    const userRole = req.user?.role;
+    const userId = req.user?.id || req.user?.user_id;
+
+    // Only mediators and admins can review uploads
+    if (userRole !== 'mediator' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Mediator or Admin access required' });
+    }
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Must be "approve" or "reject"' });
+    }
+
+    // Fetch the upload
+    const { data: upload, error: fetchError } = await supabase
+      .from('uploads')
+      .select('*, cases(id, mediator_id)')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !upload) {
+      console.error('Upload fetch error:', fetchError);
+      return res.status(404).json({ error: 'Upload not found' });
+    }
+
+    // If mediator, verify they are assigned to this case
+    if (userRole === 'mediator' && upload.cases?.mediator_id !== userId) {
+      return res.status(403).json({ error: 'Forbidden: Not assigned to this case' });
+    }
+
+    // Update upload status
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    const updateData = {
+      status: newStatus,
+      updated_at: new Date().toISOString()
+    };
+
+    if (notes) {
+      updateData.notes = notes;
+    }
+
+    const { data: updatedUpload, error: updateError } = await supabase
+      .from('uploads')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Upload update error:', updateError);
+      return res.status(500).json({ error: 'Failed to update upload' });
+    }
+
+    // Create notification for the uploader
+    const notificationMessage = action === 'approve'
+      ? `Your ${upload.doc_type} document has been approved`
+      : `Your ${upload.doc_type} document was rejected${notes ? ': ' + notes : ''}`;
+
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: upload.user_id,
+        message: notificationMessage,
+        type: action === 'approve' ? 'upload_approved' : 'upload_rejected',
+        related_id: upload.id,
+        created_at: new Date().toISOString()
+      });
+
+    // Broadcast case update
+    if (upload.case_uuid || upload.case_id) {
+      await broadcastCaseUpdate(
+        upload.case_uuid || upload.case_id,
+        action === 'approve' ? 'upload_confirmed' : 'upload_rejected',
+        upload.doc_type,
+        userId
+      );
+    }
+
+    console.log(`[uploads:review] ${action}d upload ${id} by ${userRole} ${userId}`);
+
+    return res.json({
+      success: true,
+      upload: updatedUpload,
+      action,
+      message: `Document ${action}d successfully`
+    });
+
+  } catch (err) {
+    console.error('Review route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

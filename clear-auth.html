@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Auth Token</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #b91c1c;
+        }
+        .success {
+            background: #10b981;
+        }
+        .success:hover {
+            background: #059669;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            color: #1f2937;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔧 Clear Authentication Token</h1>
+        
+        <div class="info">
+            <strong>Why do this?</strong><br>
+            The backend was updated to include the user's role in the JWT token. Your current token doesn't have this field, which is causing 403 Forbidden errors. You need to clear the old token and log in again to get a new one with the role included.
+        </div>
+
+        <div class="status" id="status">
+            <strong>Current token status:</strong> <span id="tokenStatus">Checking...</span>
+        </div>
+
+        <button onclick="clearToken()">🗑️ Clear Token</button>
+        <button onclick="checkToken()" class="success">🔍 Check Token</button>
+        <button onclick="goToLogin()" class="success">🔑 Go to Login Page</button>
+
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        function checkToken() {
+            const token = localStorage.getItem('auth_token');
+            const statusEl = document.getElementById('tokenStatus');
+            
+            if (!token) {
+                statusEl.innerHTML = '<strong style="color: #10b981;">✅ No token found (cleared)</strong>';
+                return;
+            }
+
+            try {
+                // Decode JWT (simple base64 decode of payload)
+                const parts = token.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(atob(parts[1]));
+                    const hasRole = 'role' in payload;
+                    
+                    statusEl.innerHTML = `
+                        <strong style="color: ${hasRole ? '#10b981' : '#dc2626'};">
+                            ${hasRole ? '✅' : '❌'} Token found
+                        </strong><br>
+                        Email: ${payload.email || 'N/A'}<br>
+                        Role: ${payload.role || '<span style="color: #dc2626;">MISSING (this is the problem!)</span>'}<br>
+                        User ID: ${payload.sub || 'N/A'}<br>
+                        Expires: ${payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A'}
+                    `;
+                } else {
+                    statusEl.innerHTML = '<strong style="color: #dc2626;">Invalid token format</strong>';
+                }
+            } catch (e) {
+                statusEl.innerHTML = '<strong style="color: #dc2626;">Error decoding token: ' + e.message + '</strong>';
+            }
+        }
+
+        function clearToken() {
+            // Clear all auth-related items
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            localStorage.removeItem('activeCaseId');
+            localStorage.removeItem('devMode');
+            localStorage.removeItem('lastRoute');
+            
+            document.getElementById('result').innerHTML = `
+                <div style="background: #10b981; color: white; padding: 15px; border-radius: 6px;">
+                    ✅ <strong>Token cleared successfully!</strong><br>
+                    <small>All authentication data has been removed from localStorage.</small><br>
+                    <small>Click "Go to Login Page" to log in again with a fresh token.</small>
+                </div>
+            `;
+            
+            checkToken();
+        }
+
+        function goToLogin() {
+            window.location.href = 'http://localhost:5173/#/sign-in';
+        }
+
+        // Check on load
+        checkToken();
+    </script>
+</body>
+</html>

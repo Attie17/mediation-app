@@ -204,13 +204,14 @@
                         role: 'mediator'
                     },
                     divorcee: {
-                        id: 'dev-divorcee-uuid',
-                        email: 'divorcee@dev.local',
-                        name: 'Dev Divorcee',
-                        role: 'divorcee'
+                        id: '22222222-2222-2222-2222-222222222222',
+                        email: 'bob@example.com',
+                        name: 'Bob Divorcee',
+                        role: 'divorcee',
+                        user_id: '22222222-2222-2222-2222-222222222222'
                     },
                     lawyer: {
-                        id: 'dev-lawyer-uuid',
+                        id: '11111111-1111-1111-1111-111111111111',
                         email: 'lawyer@dev.local',
                         name: 'Dev Lawyer',
                         role: 'lawyer'
@@ -219,10 +220,15 @@
 
                 const user = devUsers[selectedRole];
 
-                // Set authentication in localStorage
-                localStorage.setItem('token', 'dev-fake-token');
+                // Clear any existing auth data first
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Set authentication in localStorage (use 'auth_token' to match AuthContext)
+                localStorage.setItem('auth_token', 'dev-fake-token');
+                localStorage.setItem('token', 'dev-fake-token'); // Backup for compatibility
                 localStorage.setItem('user', JSON.stringify(user));
-                localStorage.setItem('activeCaseId', '4');
+                localStorage.setItem('activeCaseId', selectedRole === 'divorcee' ? '3bcb2937-0e55-451a-a9fd-659187af84d4' : '4');
                 localStorage.setItem('devMode', 'true');
                 localStorage.setItem('lastRoute', '/');
 
@@ -233,9 +239,9 @@
                     <div class="redirect-msg">Redirecting to dashboard in 2 seconds...</div>
                 `;
 
-                // Redirect to the app after 2 seconds
+                // Redirect to the app dashboard (will auto-redirect to role-specific dashboard)
                 setTimeout(() => {
-                    window.location.href = 'http://localhost:5173';
+                    window.location.href = 'http://localhost:5173/dashboard';
                 }, 2000);
 
             } catch (error) {

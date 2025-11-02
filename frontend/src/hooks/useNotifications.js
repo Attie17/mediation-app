@@ -36,8 +36,12 @@ export function useNotifications(pollMs = 20000) {
       setItems(prev => prev.map(n => ({ ...n, read: true })));
       await apiFetch('/api/notifications/read-all', {
         method: 'POST',
-      }).catch(() => {});
-    } catch {}
+      });
+    } catch (err) {
+      console.error('Failed to mark notifications as read:', err);
+      setError('Failed to mark notifications as read');
+      fetchItems();
+    }
   };
 
   const unreadCount = items.filter(n => !n.read).length;

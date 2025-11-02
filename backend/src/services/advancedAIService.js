@@ -20,6 +20,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'your-api-key'
 });
 
+// Configuration
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS) || 2000;
+
 // Legal knowledge base and patterns
 const LEGAL_PATTERNS = {
   south_african_family_law: {
@@ -82,7 +86,46 @@ class AdvancedAIService {
   // Comprehensive legal analysis with South African family law expertise
   async provideLegalGuidance(query, caseContext = {}) {
     try {
-      const systemPrompt = `You are an AI assistant specialized in South African family law and divorce mediation. 
+      const systemPrompt = `You are an AI assistant specialized in South African family law, divorce mediation, AND the MediationApp platform administration.
+      
+      CRITICAL RULES - HALLUCINATION PREVENTION:
+      - If you don't know something, explicitly say "I don't know" or "I don't have enough information"
+      - NEVER make up legal information, case law, or statutes
+      - Only cite laws and regulations you are certain about
+      - If asked about specific cases or recent legal changes, acknowledge limitations
+      - When providing information, cite the specific source (Act, section number, year)
+      - If the question requires current/recent information beyond your knowledge, suggest web research or consulting an attorney
+      
+      MEDIATIONAPP PLATFORM KNOWLEDGE:
+      
+      FOR ADMIN USERS - ORGANIZATION MANAGEMENT:
+      - To add a new organization: Click "Organizations" in the sidebar → Click the green "+ New Organization" button in the top-right
+      - Organization fields: Name, Display Name, Email, Phone, Subscription Tier (Trial/Basic/Pro/Enterprise)
+      - Each organization has limits: Max Active Cases, Max Mediators, Storage Limit
+      - Trial tier: 14-day free trial, then must upgrade
+      - Organizations can be viewed, edited, or soft-deleted from the Organizations page
+      - View organization details by clicking "View Details" on any organization card
+      
+      FOR ADMIN USERS - CASE ASSIGNMENT:
+      - Navigate to "Case Assignments" in the sidebar to manage mediator workload
+      - Three tabs: Unassigned Cases, Mediator Workload, All Assignments
+      - Assign cases: Select case → Choose mediator → Add notes → Click "Assign"
+      - Mediator capacity: Available (0-2 cases), Good (3-4), Busy (5-6), Overloaded (7+)
+      - Reassign or unassign cases from the "All Assignments" tab
+      
+      FOR ADMIN USERS - USER MANAGEMENT:
+      - Navigate to "User Management" to view all users across all organizations
+      - Change user roles, activate/deactivate accounts
+      - Invite new users to specific organizations
+      
+      FOR ALL USERS - AI ASSISTANT:
+      - Available in sidebar under "Case Tools" → "AI Assistant"
+      - Provides legal guidance, document help, and platform assistance
+      
+      FOR MEDIATORS - CASE CREATION:
+      - Click "Create New Case" in sidebar
+      - Required: Case title, parties involved, case type
+      - Cases are automatically linked to mediator's organization
       
       IMPORTANT DISCLAIMERS:
       - You cannot provide actual legal advice
@@ -90,18 +133,23 @@ class AdvancedAIService {
       - Focus on general information and process guidance
       - Emphasize mediation and collaborative solutions
       
-      EXPERTISE AREAS:
+      VERIFIED EXPERTISE AREAS (cite these when applicable):
       - South African Divorce Act 70 of 1979
       - Children's Act 38 of 2005
       - Maintenance Act 99 of 1998
       - Rule 41A mediation requirements
-      - Gauteng Province 2025 mediation directives
       
       CULTURAL SENSITIVITY:
       - Acknowledge South Africa's diverse cultural context
       - Respect traditional and modern family structures
       - Consider language and cultural barriers
       - Promote inclusive solutions
+      
+      RESPONSE FORMAT:
+      - For platform questions: Provide clear step-by-step instructions with specific button names and locations
+      - For legal questions: Start factual answers with: "According to [specific law/act]..."
+      - For uncertain information: "I don't have confirmed information about this. You should consult..."
+      - For recent changes: "I may not have the most current information. Please verify with..."
       
       Case context: ${JSON.stringify(caseContext)}`;
 
@@ -110,19 +158,37 @@ class AdvancedAIService {
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: query }
-        ]
+        ],
+        temperature: 0.3  // Lower temperature for more factual responses
       });
 
       const analysis = response.choices[0].message.content;
 
-      // Store the interaction for learning
-      await this.storeLegalInteraction(query, analysis, caseContext);
+      // Check if response indicates uncertainty - if so, suggest web search
+      const uncertaintyKeywords = ['I don\'t know', 'I don\'t have', 'uncertain', 'not sure', 'may not have current', 'beyond my knowledge'];
+      const hasUncertainty = uncertaintyKeywords.some(keyword => analysis.toLowerCase().includes(keyword.toLowerCase()));
+
+      let webSearchSuggestion = null;
+      if (hasUncertainty) {
+        webSearchSuggestion = "For the most current and accurate information, consider searching legal databases or consulting with a qualified attorney.";
+      }
+
+      // Store the interaction for learning (non-blocking - failures won't affect response)
+      try {
+        await this.storeLegalInteraction(query, analysis, caseContext);
+      } catch (storageError) {
+        // Log error but don't fail the request
+        console.warn('[AI] Failed to store interaction (non-critical):', storageError.message);
+      }
 
       return {
+        ok: true,
         guidance: analysis,
         disclaimer: "This is general information only. Please consult with a qualified South African family law attorney for legal advice.",
         confidence: this.calculateConfidence(query, analysis),
-        follow_up_suggestions: await this.generateFollowUpQuestions(query, caseContext)
+        follow_up_suggestions: await this.generateFollowUpQuestions(query, caseContext),
+        web_search_suggested: hasUncertainty,
+        web_search_note: webSearchSuggestion
       };
 
     } catch (error) {
@@ -250,7 +316,18 @@ class AdvancedAIService {
       - Respect for different emotional expression norms
       - Language barriers affecting emotional clarity
       
-      Speaker context: ${JSON.stringify(speakerContext)}`;
+      Speaker context: ${JSON.stringify(speakerContext)}
+      
+      IMPORTANT: Respond with ONLY valid JSON in this exact format:
+      {
+        "primary_emotion": "emotion name",
+        "intensity": 7,
+        "stress_signals": ["signal1", "signal2"],
+        "needs": ["need1", "need2"],
+        "de_escalation": ["suggestion1", "suggestion2"],
+        "communication_tips": ["tip1", "tip2"],
+        "cultural_notes": "any relevant notes"
+      }`;
 
       const response = await openai.chat.completions.create({
         ...this.modelConfig,
@@ -260,21 +337,50 @@ class AdvancedAIService {
         ]
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content);
+      const content = response.choices[0].message.content;
+      let analysis;
+      
+      try {
+        // Try to parse as JSON
+        analysis = JSON.parse(content);
+      } catch (parseError) {
+        // If not JSON, try to extract JSON from markdown code blocks
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (jsonMatch) {
+          analysis = JSON.parse(jsonMatch[1]);
+        } else {
+          // Last resort: look for any JSON object in the response
+          const objectMatch = content.match(/\{[\s\S]*\}/);
+          if (objectMatch) {
+            analysis = JSON.parse(objectMatch[0]);
+          } else {
+            throw new Error('Could not parse AI response as JSON');
+          }
+        }
+      }
 
       return {
-        primary_emotion: analysis.primary_emotion,
-        intensity_level: analysis.intensity, // 1-10
-        stress_indicators: analysis.stress_signals,
-        underlying_needs: analysis.needs,
-        de_escalation_suggestions: analysis.de_escalation,
-        communication_recommendations: analysis.communication_tips,
-        cultural_considerations: analysis.cultural_notes
+        ok: true,
+        data: {
+          primary_emotion: analysis.primary_emotion,
+          intensity_level: analysis.intensity, // 1-10
+          stress_indicators: analysis.stress_signals || [],
+          underlying_needs: analysis.needs || [],
+          de_escalation_suggestions: analysis.de_escalation || [],
+          communication_recommendations: analysis.communication_tips || [],
+          cultural_considerations: analysis.cultural_notes || ''
+        }
       };
 
     } catch (error) {
       console.error('Emotional analysis error:', error);
-      throw new Error('Unable to analyze emotional state');
+      return {
+        ok: false,
+        error: {
+          code: 'EMOTION_ANALYSIS_FAILED',
+          message: error.message || 'Unable to analyze emotional state'
+        }
+      };
     }
   }
 
@@ -579,6 +685,79 @@ class AdvancedAIService {
     } catch (error) {
       console.error('AI health check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Analyze emotion in text
+   */
+  async analyzeEmotion(text) {
+    return this.analyzeEmotionalState(text);
+  }
+
+  /**
+   * Extract key points from transcript
+   */
+  async extractKeyPoints(transcript) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'system',
+            content: 'Extract the key discussion points, agreements, and concerns from this mediation transcript. Format as a structured list.'
+          },
+          {
+            role: 'user',
+            content: transcript
+          }
+        ]
+      });
+
+      const content = response.choices[0].message.content;
+      
+      return {
+        ok: true,
+        keyPoints: content,
+        rawResponse: content
+      };
+    } catch (error) {
+      console.error('[extractKeyPoints] Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Suggest neutral phrasing for emotionally charged text
+   */
+  async suggestNeutralPhrasing(text) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a mediation expert. Rephrase emotionally charged statements into neutral, constructive language that promotes dialogue and understanding.'
+          },
+          {
+            role: 'user',
+            content: `Please rephrase this in a neutral, constructive way: "${text}"`
+          }
+        ]
+      });
+
+      const suggestion = response.choices[0].message.content;
+      
+      return {
+        ok: true,
+        suggestion: suggestion,
+        original: text
+      };
+    } catch (error) {
+      console.error('[suggestNeutralPhrasing] Error:', error);
+      throw error;
     }
   }
 }

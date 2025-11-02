@@ -17,6 +17,7 @@ export default function DashboardRedirect() {
     return <Navigate to="/signin" replace />;
   }
 
+  // All users go directly to their role-specific dashboards
   const path = user.role === 'admin' ? '/admin'
     : user.role === 'mediator' ? '/mediator'
     : user.role === 'divorcee' ? '/divorcee'

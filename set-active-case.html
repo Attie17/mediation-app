@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Set Active Case</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1e293b;
+            color: white;
+        }
+        .case-list {
+            margin: 20px 0;
+        }
+        .case-item {
+            background: #334155;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .case-item:hover {
+            background: #475569;
+            transform: translateX(5px);
+        }
+        .case-id {
+            font-family: monospace;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .status-open { background: #10b981; }
+        .status-in_progress { background: #f59e0b; }
+        .status-closed { background: #6b7280; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .success {
+            background: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .error {
+            background: #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Set Active Case for Homepage</h1>
+    <p>Click on a case to set it as your active case:</p>
+    
+    <button onclick="loadCases()">Load Cases</button>
+    
+    <div id="message"></div>
+    <div id="caseList" class="case-list"></div>
+
+    <script>
+        const API_URL = 'http://localhost:4000';
+        
+        async function loadCases() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                showMessage('No auth token found. Please login first at http://localhost:5173', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/cases`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const cases = await response.json();
+                displayCases(cases);
+            } catch (error) {
+                showMessage(`Error loading cases: ${error.message}`, 'error');
+            }
+        }
+
+        function displayCases(cases) {
+            const caseList = document.getElementById('caseList');
+            
+            if (cases.length === 0) {
+                caseList.innerHTML = '<p>No cases found. Run the seed script: node backend/seed-attie-data.js</p>';
+                return;
+            }
+
+            caseList.innerHTML = cases.map(c => `
+                <div class="case-item" onclick="setActiveCase('${c.id}', '${c.description}')">
+                    <strong>${c.description}</strong>
+                    <span class="status status-${c.status}">${c.status}</span>
+                    <div class="case-id">${c.id}</div>
+                </div>
+            `).join('');
+        }
+
+        function setActiveCase(caseId, caseName) {
+            localStorage.setItem('activeCaseId', caseId);
+            showMessage(`✅ Active case set to: ${caseName} (${caseId})`, 'success');
+            
+            setTimeout(() => {
+                window.location.href = 'http://localhost:5173';
+            }, 1500);
+        }
+
+        function showMessage(msg, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = msg;
+        }
+
+        // Auto-set first case if none is active
+        async function autoSetFirstCase() {
+            const current = localStorage.getItem('activeCaseId');
+            if (current) {
+                showMessage(`✅ Already have active case: ${current}`, 'success');
+                await loadCases();
+                return;
+            }
+
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                showMessage('Please login at http://localhost:5173 first', 'error');
+                return;
+            }
+
+            try {
+                const userId = '44d32632-d369-5263-9111-334e03253f94';
+                const response = await fetch(`http://localhost:4000/api/cases/user/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const cases = await response.json();
+                
+                if (cases.length > 0) {
+                    const firstCase = cases[0];
+                    localStorage.setItem('activeCaseId', firstCase.id);
+                    showMessage(`✅ Auto-set active case: ${firstCase.description} (${firstCase.id})`, 'success');
+                    displayCases(cases);
+                    
+                    setTimeout(() => {
+                        if (confirm('Active case set! Go to homepage now?')) {
+                            window.location.href = 'http://localhost:5173';
+                        }
+                    }, 1000);
+                } else {
+                    showMessage('No cases found. Run: node backend/seed-attie-data.js', 'error');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`, 'error');
+            }
+        }
+
+        // Auto-load on page load
+        window.onload = autoSetFirstCase;
+    </script>
+</body>
+</html>

@@ -16,8 +16,6 @@ const CaseDetailsPage = () => {
   // Mock user role - in a real app this would come from authentication context
   const userRole = 'mediator'; // Could be 'mediator', 'divorcee', 'admin', etc.
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-
   const currentUser = useMemo(() => {
     if (userRole === 'mediator') {
       return {

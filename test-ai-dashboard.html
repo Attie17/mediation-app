@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Features Test Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    
+    .content {
+      padding: 30px;
+    }
+    
+    .test-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f7fafc;
+      border-radius: 12px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .test-section h2 {
+      color: #2d3748;
+      margin-bottom: 15px;
+      font-size: 20px;
+    }
+    
+    .test-section p {
+      color: #4a5568;
+      margin-bottom: 15px;
+      line-height: 1.6;
+    }
+    
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      margin-bottom: 10px;
+      resize: vertical;
+      min-height: 100px;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 2px solid #e2e8f0;
+      display: none;
+    }
+    
+    .result.show {
+      display: block;
+    }
+    
+    .result.success {
+      border-color: #48bb78;
+      background: #f0fff4;
+    }
+    
+    .result.error {
+      border-color: #f56565;
+      background: #fff5f5;
+    }
+    
+    .result-header {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #2d3748;
+    }
+    
+    .result-content {
+      color: #4a5568;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .sample-data {
+      background: #edf2f7;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #4a5568;
+      margin-bottom: 10px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🤖 AI Features Test Dashboard</h1>
+      <p>Test all AI capabilities for the Mediation App</p>
+      <div id="auth-status" style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 14px;">
+        🔄 Authenticating...
+      </div>
+    </div>
+    
+    <div class="content">
+      <!-- Health Check -->
+      <div class="test-section">
+        <h2>1. Health Check</h2>
+        <p>Verify that the AI service is running and accessible.</p>
+        <button onclick="testHealthCheck()">Run Health Check</button>
+        <div id="health-result" class="result"></div>
+      </div>
+      
+      <!-- Chat Summarization -->
+      <div class="test-section">
+        <h2>2. Chat Summarization</h2>
+        <p>Summarize a conversation between parties in mediation.</p>
+        <div class="sample-data">Sample: Pre-filled with example messages</div>
+        <textarea id="chat-messages" placeholder="Enter chat messages (JSON format)">
+[
+  { "sender": "Party A", "message": "I think we should split the assets 50/50." },
+  { "sender": "Party B", "message": "I disagree! I contributed more to our savings." },
+  { "sender": "Party A", "message": "Can we discuss this calmly and find middle ground?" }
+]</textarea>
+        <button onclick="testChatSummary()">Summarize Chat</button>
+        <div id="summary-result" class="result"></div>
+      </div>
+      
+      <!-- Emotional Tone Detection -->
+      <div class="test-section">
+        <h2>3. Emotional Tone Detection</h2>
+        <p>Analyze the emotional tone of a message.</p>
+        <textarea id="emotion-text" placeholder="Enter text to analyze">I'm really frustrated with how this is going. This feels completely unfair to me!</textarea>
+        <button onclick="testEmotionDetection()">Analyze Emotion</button>
+        <div id="emotion-result" class="result"></div>
+      </div>
+      
+      <!-- Key Points Extraction -->
+      <div class="test-section">
+        <h2>4. Key Points Extraction</h2>
+        <p>Extract key discussion points from a session transcript.</p>
+        <textarea id="transcript-text" placeholder="Enter session transcript">
+Mediator: Let's discuss the custody arrangement.
+Party A: I want shared custody. The kids need both parents.
+Party B: I agree with shared custody, but I'm worried about the logistics.
+Mediator: Let's work on a schedule that works for everyone.</textarea>
+        <button onclick="testKeyPoints()">Extract Key Points</button>
+        <div id="keypoints-result" class="result"></div>
+      </div>
+      
+      <!-- Neutral Phrasing -->
+      <div class="test-section">
+        <h2>5. Neutral Phrasing Suggestion</h2>
+        <p>Convert emotionally charged language to neutral, constructive phrasing.</p>
+        <textarea id="phrasing-text" placeholder="Enter text to rephrase">You never listen to me! You always make everything about yourself!</textarea>
+        <button onclick="testNeutralPhrasing()">Get Neutral Suggestion</button>
+        <div id="phrasing-result" class="result"></div>
+      </div>
+      
+      <!-- Legal Guidance -->
+      <div class="test-section">
+        <h2>6. Legal Guidance</h2>
+        <p>Get general legal information about divorce and mediation topics.</p>
+        <textarea id="legal-question" placeholder="Enter your legal question">How is marital property typically divided in divorce proceedings in South Africa?</textarea>
+        <button onclick="testLegalGuidance()">Get Legal Guidance</button>
+        <div id="legal-result" class="result"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BASE_URL = 'http://localhost:4000';
+    let TOKEN = null;
+
+    // Auto-login to get a valid token
+    async function getToken() {
+      if (TOKEN) return TOKEN;
+      
+      try {
+        // Try using dev-fake token for development bypass
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+          TOKEN = 'dev-fake-ai-test-token-123456';
+          return TOKEN;
+        }
+        
+        // Try to get token from localStorage first
+        TOKEN = localStorage.getItem('token');
+        if (TOKEN) return TOKEN;
+        
+        // If no token, login with test credentials
+        const response = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'attie@ngwaverley.co.za',
+            password: 'password123'
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          TOKEN = data.token;
+          return TOKEN;
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('Failed to get token:', error);
+        return 'dev-fake-ai-test-token-123456'; // Fallback to dev token
+      }
+    }
+
+    async function apiCall(endpoint, method = 'GET', body = null) {
+      const token = await getToken();
+      
+      const options = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Dev-Email': 'attie@ngwaverley.co.za',
+          'X-Dev-Role': 'mediator',
+          'X-Dev-User-Id': '44d32632-d369-5263-9111-334e03253f94'
+        }
+      };
+
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(`${BASE_URL}${endpoint}`, options);
+      const data = await response.json();
+      
+      return { ok: response.ok, status: response.status, data };
+    }
+
+    function showResult(elementId, success, message) {
+      const resultEl = document.getElementById(elementId);
+      resultEl.className = `result show ${success ? 'success' : 'error'}`;
+      resultEl.innerHTML = `
+        <div class="result-header">${success ? '✅ Success' : '❌ Error'}</div>
+        <div class="result-content">${message}</div>
+      `;
+    }
+
+    async function testHealthCheck() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Checking...';
+      
+      try {
+        const result = await apiCall('/api/ai/health');
+        showResult('health-result', result.ok, JSON.stringify(result.data, null, 2));
+      } catch (error) {
+        showResult('health-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Run Health Check';
+      }
+    }
+
+    async function testChatSummary() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Summarizing...';
+      
+      try {
+        const messages = JSON.parse(document.getElementById('chat-messages').value);
+        // Convert messages array to text format
+        const text = messages.map(m => `${m.sender}: ${m.message}`).join('\n');
+        const result = await apiCall('/api/ai/summarize', 'POST', { text, context: 'chat' });
+        
+        // Format the summary result nicely
+        let display = '';
+        if (result.ok && result.data && result.data.summary) {
+          const summary = result.data.summary;
+          display = `Summary: ${summary.summary || summary}\n\n`;
+          if (summary.keyPoints && summary.keyPoints.length > 0) {
+            display += `Key Points:\n${summary.keyPoints.map(p => `  • ${p}`).join('\n')}\n\n`;
+          }
+          if (summary.agreements && summary.agreements.length > 0) {
+            display += `Agreements:\n${summary.agreements.map(a => `  • ${a}`).join('\n')}\n\n`;
+          }
+          if (summary.unresolvedIssues && summary.unresolvedIssues.length > 0) {
+            display += `Unresolved Issues:\n${summary.unresolvedIssues.map(i => `  • ${i}`).join('\n')}`;
+          }
+        } else {
+          display = JSON.stringify(result, null, 2);
+        }
+        
+        showResult('summary-result', result.ok, display);
+      } catch (error) {
+        showResult('summary-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Summarize Chat';
+      }
+    }
+
+    async function testEmotionDetection() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Analyzing...';
+      
+      try {
+        const text = document.getElementById('emotion-text').value;
+        const result = await apiCall('/api/ai/analyze-emotion', 'POST', { text });
+        showResult('emotion-result', result.ok, JSON.stringify(result.data, null, 2));
+      } catch (error) {
+        showResult('emotion-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Analyze Emotion';
+      }
+    }
+
+    async function testKeyPoints() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Extracting...';
+      
+      try {
+        const transcript = document.getElementById('transcript-text').value;
+        const result = await apiCall('/api/ai/extract-key-points', 'POST', { transcript });
+        showResult('keypoints-result', result.ok, JSON.stringify(result.data, null, 2));
+      } catch (error) {
+        showResult('keypoints-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Extract Key Points';
+      }
+    }
+
+    async function testNeutralPhrasing() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Processing...';
+      
+      try {
+        const text = document.getElementById('phrasing-text').value;
+        const result = await apiCall('/api/ai/suggest-phrasing', 'POST', { text });
+        showResult('phrasing-result', result.ok, 
+          result.ok ? result.data.suggestion : JSON.stringify(result.data, null, 2));
+      } catch (error) {
+        showResult('phrasing-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Get Neutral Suggestion';
+      }
+    }
+
+    async function testLegalGuidance() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>Researching...';
+      
+      try {
+        const question = document.getElementById('legal-question').value;
+        const result = await apiCall('/api/ai/legal-guidance', 'POST', { question, context: 'divorce mediation' });
+        showResult('legal-result', result.ok, 
+          result.ok ? result.data.guidance : JSON.stringify(result.data, null, 2));
+      } catch (error) {
+        showResult('legal-result', false, error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Get Legal Guidance';
+      }
+    }
+    
+    // Initialize and check authentication
+    window.addEventListener('DOMContentLoaded', async () => {
+      const authStatus = document.getElementById('auth-status');
+      try {
+        const token = await getToken();
+        if (token) {
+          authStatus.innerHTML = '✅ Authenticated - Ready to test!';
+          authStatus.style.background = 'rgba(72, 187, 120, 0.3)';
+        } else {
+          authStatus.innerHTML = '❌ Authentication failed - Tests may not work';
+          authStatus.style.background = 'rgba(245, 101, 101, 0.3)';
+        }
+      } catch (error) {
+        authStatus.innerHTML = '⚠️ Could not authenticate - Check if server is running';
+        authStatus.style.background = 'rgba(237, 137, 54, 0.3)';
+      }
+    });
+  </script>
+</body>
+</html>

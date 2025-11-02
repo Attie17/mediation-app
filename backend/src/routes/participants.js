@@ -24,6 +24,10 @@ router.use(authenticateUser);
 const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const isUuid = (value) => typeof value === 'string' && uuidPattern.test(value);
 
+const parseCaseId = (value) => {
+  return isUuid(value) ? value : null;
+};
+
 function validateUUID(req, res, next) {
   const { case_id, participant_id } = req.body;
   if (case_id && !isUuid(case_id)) return res.status(400).json({ error: "Invalid case_id" });
@@ -363,8 +367,14 @@ async function loadParticipant(client, caseId, participantId) {
 }
 
 router.get('/:caseId/participants', async (req, res) => {
+  console.log('🔍 [participants] GET /:caseId/participants', { 
+    rawCaseId: req.params.caseId,
+    isUuidResult: isUuid(req.params.caseId)
+  });
   const caseId = parseCaseId(req.params.caseId);
+  console.log('🔍 [participants] parseCaseId result:', caseId);
   if (!caseId) {
+    console.log('❌ [participants] Invalid case ID');
     return res.status(400).json({ error: 'Invalid case ID' });
   }
 
@@ -544,4 +554,4 @@ router.delete('/admin/participants/:id', validateUUID, async (req, res) => {
   }, res);
 });
 
-export default router;
+export default router;// trigger restart

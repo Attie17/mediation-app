@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const STEPS = [
+  'Case Details',
   'Personal Info',
   'Marriage Details',
   'Children',
@@ -10,6 +11,7 @@ const STEPS = [
 ];
 
 const initialState = {
+  caseInfo: { title: '', description: '' },
   personal: { name: '', dob: '', email: '', phone: '', address: '' },
   marriage: { marriageDate: '', separationDate: '', place: '' },
   children: [],
@@ -34,7 +36,7 @@ const custodyOptions = [
   'Other'
 ];
 
-function DivorceeIntakeForm({ userId }) {
+function DivorceeIntakeForm() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(() => {
     const draft = localStorage.getItem('divorceeIntakeDraft');
@@ -121,6 +123,10 @@ function DivorceeIntakeForm({ userId }) {
     let valid = true;
     let v = {};
     if (step === 0) {
+      const { title } = form.caseInfo;
+      if (!title) { v.title = 'Required'; valid = false; }
+    }
+    if (step === 1) {
       const { name, dob, email, phone, address } = form.personal;
       if (!name) { v.name = 'Required'; valid = false; }
       if (!dob) { v.dob = 'Required'; valid = false; }
@@ -128,19 +134,19 @@ function DivorceeIntakeForm({ userId }) {
       if (!phone) { v.phone = 'Required'; valid = false; }
       if (!address) { v.address = 'Required'; valid = false; }
     }
-    if (step === 1) {
+    if (step === 2) {
       const { marriageDate, separationDate, place } = form.marriage;
       if (!marriageDate) { v.marriageDate = 'Required'; valid = false; }
       if (!separationDate) { v.separationDate = 'Required'; valid = false; }
       if (!place) { v.place = 'Required'; valid = false; }
     }
-    if (step === 3) {
+    if (step === 4) {
       const { employment, income, expenses } = form.financial;
       if (!employment) { v.employment = 'Required'; valid = false; }
       if (!income) { v.income = 'Required'; valid = false; }
       if (!expenses) { v.expenses = 'Required'; valid = false; }
     }
-    if (step === 4) {
+    if (step === 5) {
       if (!form.preferences.custody) { v.custody = 'Required'; valid = false; }
     }
     setValidation(v);
@@ -152,40 +158,59 @@ function DivorceeIntakeForm({ userId }) {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create case
-      const caseRes = await fetch('/api/cases', {
+      // Build payload matching backend POST /api/cases structure
+      const payload = {
+        title: form.caseInfo.title,
+        description: form.caseInfo.description || '',
+        personalInfo: {
+          name: form.personal.name,
+          dateOfBirth: form.personal.dob,
+          email: form.personal.email,
+          phone: form.personal.phone,
+          address: form.personal.address
+        },
+        marriageDetails: {
+          marriageDate: form.marriage.marriageDate,
+          separationDate: form.marriage.separationDate,
+          place: form.marriage.place
+        },
+        children: form.children.map(child => ({
+          name: child.name,
+          birthdate: child.birthdate,
+          notes: child.notes || ''
+        })),
+        financialSituation: {
+          employment: form.financial.employment,
+          income: form.financial.income,
+          expenses: form.financial.expenses,
+          assets: form.financial.assets || '',
+          debts: form.financial.debts || ''
+        },
+        preferences: {
+          custody: form.preferences.custody,
+          concerns: form.preferences.concerns || '',
+          notes: form.preferences.notes || ''
+        },
+        status: 'open'
+      };
+
+      const res = await fetch('/api/cases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'open' })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
       });
-      const caseData = await caseRes.json();
-      if (!caseRes.ok) throw new Error(caseData.error || 'Failed to create case');
-      const caseId = caseData.case_id;
-      // 2. Add participant
-      const participantRes = await fetch(`/api/cases/${caseId}/participants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          role: 'divorcee',
-          ...form.personal
-        })
-      });
-      if (!participantRes.ok) throw new Error('Failed to add participant');
-      // 3. Add children
-      for (const child of form.children) {
-        const childRes = await fetch(`/api/cases/${caseId}/children`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(child)
-        });
-        if (!childRes.ok) throw new Error('Failed to add child');
-      }
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to create case');
+
       // Success
       setSuccess(true);
       localStorage.removeItem('divorceeIntakeDraft');
       setTimeout(() => {
-        window.location.href = `/cases/${caseId}/dashboard`;
+        window.location.href = `/dashboard`;
       }, 1500);
     } catch (e) {
       setError(e.message);
@@ -200,6 +225,28 @@ function DivorceeIntakeForm({ userId }) {
       case 0:
         return (
           <div className="space-y-4">
+            <Input 
+              label="Case Title" 
+              placeholder="e.g., Smith v. Smith Divorce Mediation"
+              value={form.caseInfo.title} 
+              onChange={v => handleChange('caseInfo', 'title', v)} 
+              error={validation.title} 
+            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Case Description (Optional)</label>
+              <textarea
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                rows="4"
+                placeholder="Brief description of the case..."
+                value={form.caseInfo.description || ''}
+                onChange={e => handleChange('caseInfo', 'description', e.target.value)}
+              />
+            </div>
+          </div>
+        );
+      case 1:
+        return (
+          <div className="space-y-4">
             <Input label="Full Name" value={form.personal.name} onChange={v => handleChange('personal', 'name', v)} error={validation.name} />
             <Input label="Date of Birth" type="date" value={form.personal.dob} onChange={v => handleChange('personal', 'dob', v)} error={validation.dob} />
             <Input label="Email" value={form.personal.email} onChange={v => handleChange('personal', 'email', v)} error={validation.email} />
@@ -207,7 +254,7 @@ function DivorceeIntakeForm({ userId }) {
             <Input label="Address" value={form.personal.address} onChange={v => handleChange('personal', 'address', v)} error={validation.address} />
           </div>
         );
-      case 1:
+      case 2:
         return (
           <div className="space-y-4">
             <Input label="Date of Marriage" type="date" value={form.marriage.marriageDate} onChange={v => handleChange('marriage', 'marriageDate', v)} error={validation.marriageDate} />
@@ -215,7 +262,7 @@ function DivorceeIntakeForm({ userId }) {
             <Input label="Place of Marriage" value={form.marriage.place} onChange={v => handleChange('marriage', 'place', v)} error={validation.place} />
           </div>
         );
-      case 2:
+      case 3:
         return (
           <div className="space-y-4">
             {form.children.map((child, idx) => (
@@ -232,7 +279,7 @@ function DivorceeIntakeForm({ userId }) {
             <button type="button" className="px-4 py-2 bg-blue-100 rounded" onClick={addChild}>Add Child</button>
           </div>
         );
-      case 3:
+      case 4:
         return (
           <div className="space-y-4">
             <Input label="Employment Status" value={form.financial.employment} onChange={v => handleChange('financial', 'employment', v)} error={validation.employment} />
@@ -244,7 +291,7 @@ function DivorceeIntakeForm({ userId }) {
             <FileUpload label="Bank Statement" file={form.financial.uploads.bankStatement} onUpload={f => handleFileUpload('bankStatement', f)} />
           </div>
         );
-      case 4:
+      case 5:
         return (
           <div className="space-y-4">
             <Select label="Custody Preference" value={form.preferences.custody} options={custodyOptions} onChange={v => handleChange('preferences', 'custody', v)} error={validation.custody} />
@@ -252,7 +299,7 @@ function DivorceeIntakeForm({ userId }) {
             <Input label="Notes" value={form.preferences.notes} onChange={v => handleChange('preferences', 'notes', v)} />
           </div>
         );
-      case 5:
+      case 6:
         return (
           <div className="space-y-4">
             <SummaryCard title="Personal Info" data={form.personal} />

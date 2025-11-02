@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import config from '../config';
+
+const API_BASE_URL = config.api.baseUrl;
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -12,7 +15,7 @@ const Dashboard = () => {
       setLoading(false);
       return;
     }
-    fetch(`http://localhost:4000/dashboard/${userId}`)
+  fetch(`${API_BASE_URL}/dashboard/${userId}`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch dashboard data');
         return res.json();

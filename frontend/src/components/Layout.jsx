@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { getRandomMessage } from "../utils/messages";
 
 // Temporary auth mock (replace with Supabase later)
@@ -15,6 +15,9 @@ function getGreeting() {
 const greeting = getGreeting();
 
 export default function Layout() {
+  const location = useLocation();
+  const isOnSetupRoute = location.pathname.includes('/setup') || location.pathname.includes('/role-setup');
+  
   return (
     <div className="min-h-screen flex justify-center items-center bg-gradient-to-br from-[#0F172A] to-[#1E3A8A]">
       <div className="flex w-11/12 max-w-6xl bg-blue-900/40 rounded-xl shadow-lg overflow-hidden">
@@ -29,6 +32,10 @@ export default function Layout() {
 
         {/* RIGHT panel → Accord branding, tagline, buttons/greeting */}
         <div className="flex-1 p-10 flex flex-col justify-center items-center text-center">
+          {isOnSetupRoute ? (
+            <Outlet />
+          ) : (
+            <>
           <h1 className="text-5xl font-bold">Accord</h1>
           <p className="text-xl text-gray-300 mt-2">Mediation</p>
           <p className="text-lg text-gray-200 mt-2">Fair, guided, confidential resolution.</p>
@@ -52,6 +59,8 @@ export default function Layout() {
               <h2 className="text-xl font-semibold">{greeting}, {userName}.</h2>
               <p className="italic text-gray-300 mt-2">{getRandomMessage(userRole, userName)}</p>
             </div>
+              )}
+            </>
           )}
         </div>
       </div>

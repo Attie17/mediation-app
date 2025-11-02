@@ -27,13 +27,7 @@ const CaseRequirementsPanel = ({ caseId }) => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:4000/api/cases/${caseId}/requirements`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch requirements: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
+      const data = await apiFetch(`/api/cases/${caseId}/requirements`);
       setRequirements(data.requirements || []);
     } catch (err) {
       console.error('Error fetching requirements:', err);

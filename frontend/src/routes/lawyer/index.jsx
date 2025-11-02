@@ -5,6 +5,8 @@ import { EmptyState, NoCasesEmpty, NoUploadsEmpty } from '../../components/ui/em
 import { ProgressBar } from '../../components/ui/progress-enhanced';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardHeader } from '../../utils/dashboardHelpers';
+import AIInsightsPanel from '../../components/ai/AIInsightsPanel';
+import AIAssistantDrawer from '../../components/ai/AIAssistantDrawer';
 import { 
   FileText, 
   Users, 
@@ -19,10 +21,14 @@ import {
   Send
 } from 'lucide-react';
 import ChatDrawer from '../../components/chat/ChatDrawer';
+import config from '../../config';
+
+const API_BASE_URL = config.api.baseUrl;
 
 export default function LawyerDashboard() {
   const { user } = useAuth();
   const [chatOpen, setChatOpen] = useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const userName = user?.name || user?.email?.split('@')[0] || 'Counselor';
 
   const [stats, setStats] = useState({
@@ -35,19 +41,30 @@ export default function LawyerDashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchDashboardData = async () => {
       if (!user?.user_id) return;
       
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:4000/dashboard/stats/lawyer/${user.user_id}`);
+        const token = localStorage.getItem('token');
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+  const response = await fetch(`${API_BASE_URL}/dashboard/stats/lawyer/${user.user_id}`, {
+          headers
+        });
         const data = await response.json();
         
         if (data.ok && data.stats) {
           setStats(data.stats);
           setError(null);
         } else {
-          setError('Failed to load stats');
+          setError(data.error || 'Failed to load stats');
         }
       } catch (err) {
         console.error('Error fetching lawyer stats:', err);
@@ -57,7 +74,7 @@ export default function LawyerDashboard() {
       }
     };
     
-    fetchStats();
+    fetchDashboardData();
   }, [user?.user_id]);
 
   const header = getDashboardHeader('lawyer', userName, stats);
@@ -110,6 +127,16 @@ export default function LawyerDashboard() {
           color="lime"
         />
         </div>
+      </div>
+
+      {/* AI Insights & Next Steps */}
+      <div className="mb-6">
+        <AIInsightsPanel 
+          caseId={localStorage.getItem('activeCaseId')} 
+          userId={user?.user_id}
+          onOpenAI={() => setChatOpen(true)}
+          onOpenAssistant={() => setAiAssistantOpen(true)}
+        />
       </div>
 
       {/* Client Cases */}
@@ -326,6 +353,20 @@ export default function LawyerDashboard() {
 
       {/* Chat Drawer */}
       <ChatDrawer open={chatOpen} onOpenChange={setChatOpen} />
+
+      {/* AI Assistant Drawer */}
+      <AIAssistantDrawer 
+        isOpen={aiAssistantOpen}
+        onClose={() => setAiAssistantOpen(false)}
+        caseId={localStorage.getItem('activeCaseId')}
+        userId={user?.user_id}
+        userRole="lawyer"
+        caseContext={{
+          clientCases: stats.clientCases,
+          pendingDocuments: stats.pendingDocuments,
+          upcomingSessions: stats.upcomingSessions
+        }}
+      />
     </DashboardFrame>
   );
 }

@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import config from '../config';
+
+const API_BASE_URL = config.api.baseUrl;
 
 const IntakeForm = () => {
   const [step, setStep] = useState('');
@@ -20,7 +23,7 @@ const IntakeForm = () => {
       return;
     }
     try {
-      const res = await fetch('http://localhost:4000/intake', {
+  const res = await fetch(`${API_BASE_URL}/intake`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

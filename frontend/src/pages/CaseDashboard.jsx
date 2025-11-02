@@ -4,8 +4,7 @@ import CaseParticipants from '../components/CaseParticipants';
 import CaseNotes from '../components/CaseNotes';
 import NotificationsList from '../components/NotificationsList';
 import { useAuth } from '../context/AuthContext';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+import { apiFetch } from '../lib/apiClient';
 
 const StatusPill = ({ status }) => {
   if (!status) return null;

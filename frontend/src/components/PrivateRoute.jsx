@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null; // or a spinner
-  return user ? children : <Navigate to="/signin" replace />;
+  return user ? children : <Navigate to="/" replace />;
 };
 
 export default PrivateRoute;

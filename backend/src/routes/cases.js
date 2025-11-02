@@ -163,8 +163,8 @@ router.put('/:caseId', async (req, res) => {
       // Check user exists and is a mediator
       const { data: mediatorUser, error: medErr } = await supabase
         .from('app_users')
-        .select('id, role')
-        .eq('id', mediator_id)
+        .select('user_id, role')
+        .eq('user_id', mediator_id)
         .eq('role', 'mediator')
         .single();
       if (medErr || !mediatorUser) {
@@ -237,6 +237,148 @@ router.put('/:caseId', async (req, res) => {
 
 
 
+// GET ROUTES
+
+// GET /api/cases/user/:userId - Get all cases for a specific user
+router.get('/user/:userId', async (req, res) => {
+  console.log('📋 GET /api/cases/user/:userId - Fetching user cases');
+  try {
+    const { userId } = req.params;
+    const { role } = req.query; // Optional filter by role (mediator, divorcee, etc.)
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Helper function to enrich cases with participant surnames
+    const enrichCasesWithSurnames = async (casesToEnrich) => {
+      return await Promise.all(casesToEnrich.map(async (caseItem) => {
+        console.log(`🔍 Processing case ${caseItem.id}, title: "${caseItem.title}"`);
+        
+        // Get participants for this case (exclude mediator - only get divorcees)
+        const { data: caseParticipants, error: cpError } = await supabase
+          .from('case_participants')
+          .select('user_id, role')
+          .eq('case_id', caseItem.id)
+          .eq('role', 'divorcee');
+
+        console.log(`  👥 Found ${caseParticipants?.length || 0} divorcee participants`);
+        
+        if (cpError) {
+          console.log(`  ❌ Error fetching participants:`, cpError);
+          return { ...caseItem, couple_name: caseItem.title || 'Untitled Case' };
+        }
+        
+        if (!caseParticipants || caseParticipants.length === 0) {
+          console.log(`  ⚠️ No divorcee participants found, using title`);
+          return { ...caseItem, couple_name: caseItem.title || 'Untitled Case' };
+        }
+
+        // Get user details for participants
+        const participantIds = caseParticipants.map(cp => cp.user_id);
+        console.log(`  🔍 Searching for user IDs:`, participantIds);
+        
+        const { data: users, error: usersError } = await supabase
+          .from('app_users')
+          .select('name')
+          .in('user_id', participantIds);
+
+        console.log(`  👤 Found ${users?.length || 0} users with names:`, users?.map(u => u.name));
+        console.log(`  🔍 Users query error:`, usersError);
+        
+        if (usersError) {
+          console.log(`  ❌ Error fetching users:`, usersError);
+          return { ...caseItem, couple_name: caseItem.title || 'Untitled Case' };
+        }
+        
+        if (!users || users.length === 0) {
+          console.log(`  ⚠️ No users found, using title`);
+          return { ...caseItem, couple_name: caseItem.title || 'Untitled Case' };
+        }
+
+        // Extract surnames (last word of name)
+        const surnames = users
+          .map(u => u.name?.trim().split(' ').pop())
+          .filter(Boolean);
+
+        console.log(`  📛 Extracted surnames:`, surnames);
+
+        // Format couple name
+        let coupleName;
+        if (surnames.length === 0) {
+          coupleName = caseItem.title || 'Untitled Case';
+        } else if (surnames.length === 1) {
+          coupleName = surnames[0];
+        } else {
+          coupleName = surnames.join(' & ');
+        }
+
+        console.log(`  ✅ Final couple_name: "${coupleName}"`);
+        return { ...caseItem, couple_name: coupleName };
+      }));
+    };
+
+    // If role=mediator is specified, get cases where user is the mediator
+    if (role === 'mediator') {
+      console.log(`🎯 Filtering for mediator cases only. mediator_id: ${userId}`);
+      const { data: cases, error: casesError } = await supabase
+        .from('cases')
+        .select('*')
+        .eq('mediator_id', userId)
+        .order('created_at', { ascending: false });
+
+      console.log(`📊 Found ${cases?.length || 0} cases for mediator ${userId}`);
+      
+      if (casesError) {
+        console.error('❌ Error fetching mediator cases:', casesError);
+        return res.status(500).json({ error: 'Failed to fetch mediator cases' });
+      }
+
+      // Enrich cases with participant surnames
+      const enrichedCases = await enrichCasesWithSurnames(cases || []);
+      return res.json({ cases: enrichedCases });
+    }
+
+    // Default behavior: Get all cases where user is a participant
+    const { data: participants, error: participantsError } = await supabase
+      .from('case_participants')
+      .select('case_id')
+      .eq('user_id', userId);
+
+    if (participantsError) {
+      console.error('❌ Error fetching user cases:', participantsError);
+      return res.status(500).json({ error: 'Failed to fetch user cases' });
+    }
+
+    if (!participants || participants.length === 0) {
+      return res.json({ cases: [] });
+    }
+
+    // Get case details for all case IDs
+    const caseIds = participants.map(p => p.case_id);
+    const { data: cases, error: casesError } = await supabase
+      .from('cases')
+      .select('*')
+      .in('id', caseIds)
+      .order('created_at', { ascending: false });
+
+    if (casesError) {
+      console.error('❌ Error fetching case details:', casesError);
+      return res.status(500).json({ error: 'Failed to fetch case details' });
+    }
+
+    // Enrich cases with participant surnames (use the helper function already defined above)
+    const enrichedCases = await enrichCasesWithSurnames(cases);
+
+    console.log(`✅ Found ${enrichedCases?.length || 0} cases for user ${userId}`);
+    return res.json({ cases: enrichedCases || [] });
+
+  } catch (err) {
+    console.error('❌ Error in GET /api/cases/user/:userId:', err);
+    return res.status(500).json({ error: 'Failed to fetch user cases (server error)' });
+  }
+});
+
 // POST ROUTES FIRST - Must be before parameterized routes to avoid conflicts
 // POST / - Create a new case with seeded requirements
 // POST /api/cases - Full Divorcee Intake Integration
@@ -245,6 +387,8 @@ router.post('/', async (req, res) => {
   try {
     // Accept new payload structure
     const {
+      title = 'Untitled Case',
+      description = '',
       personalInfo = {},
       marriageDetails = {},
       children = [],
@@ -261,11 +405,16 @@ router.post('/', async (req, res) => {
     if (!personalInfo.name || !personalInfo.dateOfBirth || !personalInfo.email || !personalInfo.phone || !personalInfo.address) {
       return res.status(400).json({ error: 'Missing required personal info.' });
     }
-    // 1. Create case
+    // 1. Create case with title and description
     const { data: caseInsert, error: caseError } = await supabase
       .from('cases')
-      .insert({ status, mediator_id: null })
-      .select('id, status')
+      .insert({ 
+        title, 
+        description, 
+        status, 
+        mediator_id: null 
+      })
+      .select('id, status, title, description')
       .single();
     if (caseError) {
       console.error('❌ Error inserting case:', caseError);
@@ -320,7 +469,93 @@ router.post('/', async (req, res) => {
     if (uploadLinkError) {
       console.error('❌ Error auto-linking uploads:', uploadLinkError);
     }
-    // 6. Fetch all for response
+
+    // 6. Auto-create conversations for the case
+    try {
+      console.log('💬 Creating conversations for new case...');
+      
+      // Get all participants for the case
+      const { data: caseParticipants } = await supabase
+        .from('case_participants')
+        .select('user_id, role')
+        .eq('case_id', case_id);
+
+      const divorcees = caseParticipants?.filter(p => p.role === 'divorcee') || [];
+      const mediators = caseParticipants?.filter(p => p.role === 'mediator') || [];
+
+      const conversationsToCreate = [];
+
+      // Create group conversation if we have at least 2 participants
+      if (caseParticipants && caseParticipants.length >= 2) {
+        conversationsToCreate.push({
+          type: 'group',
+          title: 'All Participants',
+          participant_ids: caseParticipants.map(p => p.user_id)
+        });
+      }
+
+      // Create private conversations between divorcees and mediator
+      if (mediators.length > 0) {
+        const mediator = mediators[0];
+        for (const divorcee of divorcees) {
+          conversationsToCreate.push({
+            type: 'divorcee_to_mediator',
+            title: 'Private Conversation',
+            participant_ids: [divorcee.user_id, mediator.user_id]
+          });
+        }
+      }
+
+      // Create private conversation between divorcees (if there are 2)
+      if (divorcees.length === 2) {
+        conversationsToCreate.push({
+          type: 'divorcee_to_divorcee',
+          title: 'Private Discussion',
+          participant_ids: [divorcees[0].user_id, divorcees[1].user_id]
+        });
+      }
+
+      // Insert conversations
+      for (const conv of conversationsToCreate) {
+        const { data: convData, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            case_id,
+            conversation_type: conv.type,
+            title: conv.title
+          })
+          .select('id')
+          .single();
+
+        if (convError) {
+          console.error(`❌ Error creating ${conv.type} conversation:`, convError);
+          continue;
+        }
+
+        // Add participants to conversation
+        const participantRows = conv.participant_ids.map(uid => ({
+          conversation_id: convData.id,
+          user_id: uid
+        }));
+
+        const { error: partError } = await supabase
+          .from('conversation_participants')
+          .insert(participantRows);
+
+        if (partError) {
+          console.error(`❌ Error adding participants to ${conv.type} conversation:`, partError);
+        } else {
+          console.log(`   ✅ Created ${conv.type} conversation with ${conv.participant_ids.length} participants`);
+        }
+      }
+
+      console.log(`💬 Created ${conversationsToCreate.length} conversations for case`);
+    } catch (convErr) {
+      console.error('❌ Error creating conversations:', convErr);
+      // Don't fail the case creation if conversation creation fails
+    }
+
+    // 7. Fetch all for response
     const { data: participants } = await supabase
       .from('case_participants')
       .select('*')
@@ -337,7 +572,8 @@ router.post('/', async (req, res) => {
       .from('uploads')
       .select('*')
       .eq('case_id', case_id);
-    // 7. Respond
+    
+    // 8. Respond
     res.status(201).json({
       case_id,
       status: caseInsert.status,
@@ -465,42 +701,59 @@ router.get('/:id/uploads', async (req, res) => {
   try {
     const { id: caseId } = req.params;
     
-    // Validate caseId is an integer
-    const caseIdInt = parseInt(caseId, 10);
-    if (isNaN(caseIdInt) || caseIdInt <= 0) {
-      return res.status(400).json({ 
-        error: 'Invalid case ID. Must be a positive integer.' 
-      });
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(caseId)) {
+      return res.status(400).json({ error: 'Invalid case ID format' });
     }
 
-    console.log(`📂 Fetching uploads for case ID: ${caseIdInt}`);
+    console.log(`📂 Fetching uploads for case ID: ${caseId}`);
     
-    // Query uploads with their audit history
-    const { data: uploads, error } = await supabase
-      .from('uploads')
-      .select(`
-        *,
-        upload_audit (*)
-      `)
-      .eq('case_id', caseIdInt)
-      .order('created_at', { ascending: false });
+    // First try with upload_audit join - use case_uuid for UUID format case IDs
+    let uploads;
+    try {
+      const { data, error } = await supabase
+        .from('uploads')
+        .select(`
+          *,
+          upload_audit (*)
+        `)
+        .eq('case_uuid', caseId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching case uploads:', error);
-      return res.status(500).json({ error: error.message });
+      if (error) throw error;
+      
+      uploads = (data || []).map(upload => ({
+        ...upload,
+        audit_history: upload.upload_audit || []
+      }));
+      
+    } catch (auditError) {
+      // Fallback: fetch uploads without audit history
+      console.warn('upload_audit table not available, fetching without audit:', auditError.message);
+      
+      const { data, error } = await supabase
+        .from('uploads')
+        .select('*')
+        .eq('case_uuid', caseId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching case uploads:', error);
+        return res.status(500).json({ error: error.message });
+      }
+      
+      uploads = (data || []).map(upload => ({
+        ...upload,
+        audit_history: []
+      }));
     }
 
-    console.log(`📂 Found ${uploads?.length || 0} uploads for case ${caseIdInt}`);
-    
-    // Transform the data to include audit history in a more readable format
-    const uploadsWithAudit = uploads.map(upload => ({
-      ...upload,
-      audit_history: upload.upload_audit || []
-    }));
+    console.log(`📂 Found ${uploads?.length || 0} uploads for case ${caseId}`);
 
     return res.json({ 
-      caseId: caseIdInt,
-      uploads: uploadsWithAudit 
+      caseId,
+      uploads 
     });
     
   } catch (err) {
@@ -965,6 +1218,112 @@ router.post('/:caseId/children/:childId/voice', validateMediatorRole, async (req
   } catch (err) {
     console.error('Voice entry POST route error:', err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/cases/:id/status - Update case status/phase
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const caseId = req.params.id;
+    const { status, phase } = req.body;
+    const userRole = req.user?.role;
+    const userId = req.user?.id || req.user?.user_id;
+
+    if (!/^[0-9a-fA-F-]{36}$/.test(caseId)) {
+      return res.status(400).json({ error: 'Invalid case ID format' });
+    }
+
+    // Only mediators and admins can update case status
+    if (userRole !== 'mediator' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Mediator or Admin access required' });
+    }
+
+    // Fetch the case
+    const { data: existingCase, error: fetchError } = await supabase
+      .from('cases')
+      .select('id, status, phase, mediator_id')
+      .eq('id', caseId)
+      .single();
+
+    if (fetchError || !existingCase) {
+      console.error('Case fetch error:', fetchError);
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    // If mediator, verify they are assigned to this case
+    if (userRole === 'mediator' && existingCase.mediator_id !== userId) {
+      return res.status(403).json({ error: 'Forbidden: Not assigned to this case' });
+    }
+
+    // Validate status
+    const validStatuses = ['pending', 'active', 'completed', 'archived', 'on_hold'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Invalid status', 
+        validStatuses 
+      });
+    }
+
+    // Build update object
+    const updateData = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (status) {
+      updateData.status = status;
+      // If marking as completed, set closed_at
+      if (status === 'completed') {
+        updateData.closed_at = new Date().toISOString();
+      }
+    }
+
+    if (phase !== undefined) {
+      updateData.phase = phase;
+    }
+
+    // Update the case
+    const { data: updatedCase, error: updateError } = await supabase
+      .from('cases')
+      .update(updateData)
+      .eq('id', caseId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Case update error:', updateError);
+      return res.status(500).json({ error: 'Failed to update case' });
+    }
+
+    // Create notifications for all participants
+    const { data: participants } = await supabase
+      .from('case_participants')
+      .select('user_id')
+      .eq('case_id', caseId)
+      .eq('status', 'active');
+
+    if (participants && participants.length > 0) {
+      const notifications = participants.map(p => ({
+        user_id: p.user_id,
+        message: `Case status updated to: ${status || existingCase.status}`,
+        type: 'case_status_update',
+        related_id: caseId,
+        created_at: new Date().toISOString()
+      }));
+
+      await supabase.from('notifications').insert(notifications);
+    }
+
+    console.log(`[cases:status] Updated case ${caseId} to status ${status || existingCase.status} by ${userRole} ${userId}`);
+
+    return res.json({
+      success: true,
+      case: updatedCase,
+      message: 'Case status updated successfully'
+    });
+
+  } catch (err) {
+    console.error('Case status update error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

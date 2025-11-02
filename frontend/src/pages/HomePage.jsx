@@ -1,9 +1,18 @@
 import React from "react";
-import { useNavigate, Outlet, useLocation } from "react-router-dom";
+import { useNavigate, Outlet, useLocation, Navigate } from "react-router-dom";
+import { LogIn, UserPlus, Home as HomeIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { NotificationProvider } from "../context/NotificationContext";
 import TopNavigationBar from "../components/TopNavigationBar";
 import Sidebar from "../components/Sidebar";
+import HomeButton from "../components/HomeButton";
 import { NavigationCard, QuickActionCard } from "../components/NavigationCards";
+import ChatDrawer from "../components/chat/ChatDrawer";
+import AIAssistantDrawer from "../components/ai/AIAssistantDrawer";
+import CreateCaseModal from "../components/CreateCaseModal";
+import PrivacyModal from "../components/modals/PrivacyModal";
+import ProcessGuideModal from "../components/modals/ProcessGuideModal";
+import FAQModal from "../components/modals/FAQModal";
 
 function HamburgerMenuOverlay({ open, onClose, user, navigate, onLogout }) {
   const caseId = localStorage.getItem('activeCaseId');
@@ -16,7 +25,73 @@ function HamburgerMenuOverlay({ open, onClose, user, navigate, onLogout }) {
 import { supabase } from '../lib/supabase';
 import { useEffect, useState } from 'react';
 
+function GuestSidebar({ onNavigate }) {
+  const menuItems = [
+    // Removed Home - not needed
+    { label: 'Sign In', path: '/signin', icon: LogIn },
+    { label: 'Register', path: '/register', icon: UserPlus },
+  ];
+
+  return (
+    <div className="w-64 bg-slate-800 border-r border-slate-700/50 flex flex-col h-screen overflow-hidden">
+      <div className="p-4 border-b border-slate-700/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-blue-500 flex items-center justify-center">
+            <span className="text-white font-bold text-lg">M</span>
+          </div>
+          <div>
+            <div className="text-white font-semibold">MediationApp</div>
+            <div className="text-xs text-slate-400">Guest access</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-4 px-3">
+        <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Quick Links
+        </div>
+        <div className="space-y-1">
+          {menuItems.map(({ label, path, icon: Icon }) => (
+            <button
+              key={label}
+              onClick={() => onNavigate(path)}
+              className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-3 text-slate-300 hover:bg-slate-700/50 hover:text-white"
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-slate-700/50 text-xs text-slate-500">
+        Sign in to access your personalised dashboards.
+      </div>
+    </div>
+  );
+}
+
 function DashboardLandingPage({ user, navigate }) {
+  // Redirect divorcees to their dedicated dashboard
+  if (user?.role === 'divorcee') {
+    return <Navigate to="/divorcee" replace />;
+  }
+
+  // Redirect mediators to their dedicated dashboard
+  if (user?.role === 'mediator') {
+    return <Navigate to="/mediator" replace />;
+  }
+
+  // Redirect admins to their dedicated dashboard
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  // Redirect lawyers to their dedicated dashboard
+  if (user?.role === 'lawyer') {
+    return <Navigate to="/lawyer" replace />;
+  }
+
   const caseId = localStorage.getItem('activeCaseId') || '';
   const [counts, setCounts] = useState({ cases: null, documents: null, messages: null, contacts: null });
   const [loading, setLoading] = useState(true);
@@ -97,27 +172,62 @@ function DashboardLandingPage({ user, navigate }) {
 
   // Quick action cards based on live data
   const getQuickActions = () => {
+    // Role-specific paths for mediators
+    if (user?.role === 'mediator') {
+      return [
+        {
+          icon: '📋',
+          label: 'My Cases',
+          value: loading ? '...' : (counts.cases !== null ? `${counts.cases} active` : '—'),
+          gradient: 'from-teal-400 to-blue-400',
+          path: '/mediator/cases'
+        },
+        {
+          icon: '📄',
+          label: 'Documents',
+          value: loading ? '...' : (counts.documents !== null ? `${counts.documents} pending` : '—'),
+          gradient: 'from-orange-400 to-red-400',
+          path: '/mediator/review'
+        },
+        {
+          icon: '💬',
+          label: 'Messages',
+          value: loading ? '...' : (counts.messages !== null ? `${counts.messages} unread` : '—'),
+          gradient: 'from-blue-400 to-purple-400',
+          path: '/mediator' // Opens dashboard with chat
+        },
+        {
+          icon: '👥',
+          label: 'Contacts',
+          value: loading ? '...' : 'View all',
+          gradient: 'from-teal-400 to-cyan-400',
+          path: '/mediator/contacts'
+        }
+      ];
+    }
+    
+    // Default paths for divorcees, lawyers, etc.
     return [
       {
         icon: '📋',
         label: 'My Cases',
         value: loading ? '...' : (counts.cases !== null ? `${counts.cases} active` : '—'),
         gradient: 'from-teal-400 to-blue-400',
-        path: `/case/${caseId}`
+        path: caseId ? `/case/${caseId}` : '/dashboard'
       },
       {
         icon: '📄',
         label: 'Documents',
         value: loading ? '...' : (counts.documents !== null ? `${counts.documents} uploaded` : '—'),
         gradient: 'from-orange-400 to-red-400',
-        path: `/cases/${caseId}/uploads`
+        path: caseId ? `/case/${caseId}` : '/dashboard'
       },
       {
         icon: '💬',
         label: 'Messages',
         value: loading ? '...' : (counts.messages !== null ? `${counts.messages} unread` : '—'),
         gradient: 'from-blue-400 to-purple-400',
-        path: `/case/${caseId}`
+        path: caseId ? `/case/${caseId}` : '/dashboard'
       },
       {
         icon: '👥',
@@ -276,98 +386,31 @@ function DashboardLandingPage({ user, navigate }) {
         <h2 className="mt-4 text-xl font-semibold text-white text-center">Quick Actions</h2>
         
         <div className="flex justify-center mt-2">
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-[4.8rem] w-full max-w-[920px]">
-
-          {/* My Cases */}
-          <a 
-            onClick={() => {
-              const id = localStorage.getItem('activeCaseId');
-              if (id) navigate(`/case/${id}`);
-              else alert('No active case selected.');
-            }}
-            className="group relative h-full w-full overflow-hidden rounded-xl ring-1 ring-white/10 shadow-sm focus:outline-none cursor-pointer"
-          >
-            {/* gradient layer (always visible) */}
-            <span className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500" />
-            {/* content */}
-            <span className="relative z-10 grid place-items-center h-full w-full px-3">
-              <span className="flex items-center justify-center gap-3 min-w-0 text-white">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/20 grid place-items-center shrink-0">
-                  <span className="text-lg">📋</span>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[4.8rem] w-full max-w-[920px]">
+            {getQuickActions().map((action, idx) => (
+              <a 
+                key={idx}
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(action.path);
+                }}
+                className="group relative h-full w-full overflow-hidden rounded-xl ring-1 ring-white/10 shadow-sm hover:shadow-lg transition-all focus:outline-none cursor-pointer"
+              >
+                <span className={`absolute inset-0 bg-gradient-to-br ${action.gradient}`} />
+                <span className="relative z-10 grid place-items-center h-full w-full px-3">
+                  <span className="flex items-center justify-center gap-3 min-w-0 text-white">
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/20 grid place-items-center shrink-0">
+                      <span className="text-lg">{action.icon}</span>
+                    </span>
+                    <span className="leading-tight min-w-0 text-left">
+                      <span className="block text-[13px] sm:text-sm font-semibold truncate">{action.label}</span>
+                      <span className="block text-[11px] sm:text-xs/4 text-white/90 truncate">{action.value}</span>
+                    </span>
+                  </span>
                 </span>
-                <span className="leading-tight min-w-0 text-left">
-                  <span className="block text-[13px] sm:text-sm font-semibold truncate">My Cases</span>
-                  <span className="block text-[11px] sm:text-xs/4 text-white/90 truncate">5 active</span>
-                </span>
-              </span>
-            </span>
-          </a>
-
-          {/* Documents */}
-          <a 
-            onClick={() => {
-              const id = localStorage.getItem('activeCaseId');
-              if (id) navigate(`/cases/${id}/uploads`);
-              else alert('No active case selected.');
-            }}
-            className="group relative h-full w-full overflow-hidden rounded-xl ring-1 ring-white/10 shadow-sm focus:outline-none cursor-pointer"
-          >
-            <span className="absolute inset-0 bg-gradient-to-br from-orange-400 to-rose-500" />
-            <span className="relative z-10 grid place-items-center h-full w-full px-3">
-              <span className="flex items-center justify-center gap-3 min-w-0 text-white">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/20 grid place-items-center shrink-0">
-                  <span className="text-lg">📄</span>
-                </span>
-                <span className="leading-tight min-w-0 text-left">
-                  <span className="block text-[13px] sm:text-sm font-semibold truncate">Documents</span>
-                  <span className="block text-[11px] sm:text-xs/4 text-white/90 truncate">3 pending</span>
-                </span>
-              </span>
-            </span>
-          </a>
-
-          {/* Messages */}
-          <a 
-            onClick={() => {
-              const id = localStorage.getItem('activeCaseId');
-              if (id) navigate(`/case/${id}`);
-              else alert('No active case selected.');
-            }}
-            className="group relative h-full w-full overflow-hidden rounded-xl ring-1 ring-white/10 shadow-sm focus:outline-none cursor-pointer"
-          >
-            <span className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-violet-500" />
-            <span className="relative z-10 grid place-items-center h-full w-full px-3">
-              <span className="flex items-center justify-center gap-3 min-w-0 text-white">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/20 grid place-items-center shrink-0">
-                  <span className="text-lg">💬</span>
-                </span>
-                <span className="leading-tight min-w-0 text-left">
-                  <span className="block text-[13px] sm:text-sm font-semibold truncate">Messages</span>
-                  <span className="block text-[11px] sm:text-xs/4 text-white/90 truncate">2 unread</span>
-                </span>
-              </span>
-            </span>
-          </a>
-
-          {/* Contacts */}
-          <a 
-            onClick={() => navigate('/profile')}
-            className="group relative h-full w-full overflow-hidden rounded-xl ring-1 ring-white/10 shadow-sm focus:outline-none cursor-pointer"
-          >
-            <span className="absolute inset-0 bg-gradient-to-br from-teal-400 to-cyan-500" />
-            <span className="relative z-10 grid place-items-center h-full w-full px-3">
-              <span className="flex items-center justify-center gap-3 min-w-0 text-white">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-white/20 grid place-items-center shrink-0">
-                  <span className="text-lg">👥</span>
-                </span>
-                <span className="leading-tight min-w-0 text-left">
-                  <span className="block text-[13px] sm:text-sm font-semibold truncate">Contacts</span>
-                  <span className="block text-[11px] sm:text-xs/4 text-white/90 truncate">12 total</span>
-                </span>
-              </span>
-            </span>
-          </a>
-
+              </a>
+            ))}
           </div>
         </div>
 
@@ -584,15 +627,49 @@ function DashboardLandingPage({ user, navigate }) {
   );
 }
 
-export default function HomePage() {
+function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [chatOpen, setChatOpen] = React.useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = React.useState(false);
+  const [createCaseModalOpen, setCreateCaseModalOpen] = React.useState(false);
+  const [showPrivacy, setShowPrivacy] = React.useState(false);
+  const [showGuide, setShowGuide] = React.useState(false);
+  const [showFAQ, setShowFAQ] = React.useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/', { replace: true });
+  };
+
+  const handleOpenChat = () => {
+    setAiAssistantOpen(true);
+  };
+
+  const handleCreateCase = () => {
+    setCreateCaseModalOpen(true);
+  };
+
+  const handleShowPrivacy = () => {
+    setShowPrivacy(true);
+  };
+
+  const handleShowGuide = () => {
+    setShowGuide(true);
+  };
+
+  const handleShowFAQ = () => {
+    setShowFAQ(true);
+  };
+
+  const handleCaseCreated = (newCase) => {
+    setCreateCaseModalOpen(false);
+    // Navigate to the new case
+    if (newCase?.id) {
+      navigate(`/case/${newCase.id}`);
+    }
   };
 
   // Debug: Log when menu state changes
@@ -603,6 +680,8 @@ export default function HomePage() {
   // Check if we're on the root or should show the landing page
   // Show landing page only on root '/'
   const showLandingPage = location.pathname === '/';
+  const isSignInRoute = location.pathname === '/signin';
+  const shouldShowLandingPage = user && showLandingPage;
 
   // Public landing page for non-logged-in visitors
   const PublicLandingPage = () => (
@@ -662,12 +741,25 @@ export default function HomePage() {
     </div>
   );
 
-  // If user is logged in, show sidebar layout
-  if (user) {
+  // Authenticated users (and the sign-in route) share the app frame
+  if (user || isSignInRoute) {
+    const sidebar = user
+      ? <Sidebar 
+          user={user} 
+          onLogout={handleLogout} 
+          onOpenChat={handleOpenChat} 
+          onCreateCase={handleCreateCase}
+          onShowPrivacy={handleShowPrivacy}
+          onShowGuide={handleShowGuide}
+          onShowFAQ={handleShowFAQ}
+          onShowHelp={handleShowFAQ}
+        />
+      : <GuestSidebar onNavigate={navigate} />;
+
     return (
       <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Sidebar */}
-        <Sidebar user={user} onLogout={handleLogout} />
+        {sidebar}
         
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -678,10 +770,16 @@ export default function HomePage() {
                 {location.pathname === '/' ? 'Home' : location.pathname.split('/')[1].charAt(0).toUpperCase() + location.pathname.split('/')[1].slice(1)}
               </h1>
               <div className="flex items-center gap-3">
+                {user && location.pathname !== '/' && <HomeButton />}
                 <div className="px-3 py-1.5 rounded-lg bg-slate-700/50">
                   <div className="text-sm font-medium text-slate-200">
-                    {user.email?.split('@')[0] || 'User'}
+                    {user ? (user.email?.split('@')[0] || 'User') : 'Guest'}
                   </div>
+                  {user && (
+                    <div className="text-xs text-slate-400 capitalize">
+                      {user.role || 'No role'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -689,19 +787,47 @@ export default function HomePage() {
           
           {/* Content */}
           <div className="flex-1 overflow-auto">
-            {showLandingPage ? (
+            {shouldShowLandingPage ? (
               <DashboardLandingPage user={user} navigate={navigate} />
             ) : (
               <Outlet />
             )}
           </div>
         </div>
+        
+        {/* Chat Drawer - For case messaging */}
+        {user && <ChatDrawer open={chatOpen} onOpenChange={setChatOpen} />}
+        
+        {/* AI Assistant Drawer - For personalized AI help */}
+        {user && (
+          <AIAssistantDrawer 
+            isOpen={aiAssistantOpen}
+            onClose={() => setAiAssistantOpen(false)}
+            caseId={localStorage.getItem('activeCaseId')}
+            userId={user?.user_id}
+            caseContext={{ role: user?.role }}
+          />
+        )}
+        
+        {/* Create Case Modal */}
+        {user && (
+          <CreateCaseModal 
+            isOpen={createCaseModalOpen} 
+            onClose={() => setCreateCaseModalOpen(false)}
+            onCaseCreated={handleCaseCreated}
+          />
+        )}
+
+        {/* Help Modals */}
+        <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+        <ProcessGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
+        <FAQModal isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
       </div>
     );
   }
 
-  // If not logged in, show public landing page only on root, otherwise render nested route (Outlet)
-  if (location.pathname === '/') {
+  // If not logged in and on root path, show public landing page
+  if (!user && location.pathname === '/') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <TopNavigationBar 
@@ -711,7 +837,29 @@ export default function HomePage() {
         <PublicLandingPage />
       </div>
     );
-  } else {
-    return <Outlet />;
+  }
+  
+  // If not logged in and NOT on root, show auth forms (signin/register)
+  if (!user && location.pathname !== '/') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
+        <TopNavigationBar 
+          user={user} 
+          onMenuClick={() => {}} 
+        />
+        <Outlet />
+      </div>
+    );
   }
 }
+
+// Wrap HomePage with NotificationProvider
+function HomePageWithProvider() {
+  return (
+    <NotificationProvider>
+      <HomePage />
+    </NotificationProvider>
+  );
+}
+
+export default HomePageWithProvider;

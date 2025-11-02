@@ -4,8 +4,7 @@ import ChatRoom from './ChatRoom';
 import ChatAISidebar from '../ai/ChatAISidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useParams } from 'react-router-dom';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+import { API_BASE_URL, API_ENDPOINTS, getAuthHeaders } from '../../config/api';
 
 export default function ChatDrawer({ open: controlledOpen, onOpenChange, caseId = null }) {
   const { user } = useAuth();
@@ -29,23 +28,108 @@ export default function ChatDrawer({ open: controlledOpen, onOpenChange, caseId 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
 
   useEffect(() => {
-    if (!openValue) return;
+    if (!openValue || !user) return;
+    
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/chat/channels`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const items = Array.isArray(data) ? data : data.channels || [];
-        setChannels(items);
-        if (!activeId && items.length) setActiveId(items[0].id);
+        const headers = getAuthHeaders();
+
+        // For mediators and lawyers, fetch their cases and create channels
+        if (user.role === 'mediator' || user.role === 'lawyer') {
+          const casesRes = await fetch(`${API_BASE_URL}${API_ENDPOINTS.cases.list(user.user_id)}`, { headers });
+          if (!casesRes.ok) throw new Error(`HTTP ${casesRes.status}`);
+          const casesData = await casesRes.json();
+          const cases = casesData.cases || [];
+
+          // Create channel list from cases
+          const caseChannels = cases.map(c => {
+            // Extract surname from case title or description
+            let channelName = c.title || c.description || `Case ${c.id.slice(0, 8)}`;
+            
+            // Try to extract surname (assumes format like "Smith vs Smith" or "Smith Mediation")
+            const vsMatch = channelName.match(/(\w+)\s+vs\s+\w+/i);
+            const mediationMatch = channelName.match(/(\w+)\s+Mediation/i);
+            
+            if (vsMatch) {
+              channelName = `${vsMatch[1]}s`; // e.g., "Smiths"
+            } else if (mediationMatch) {
+              channelName = `${mediationMatch[1]}s`;
+            }
+            
+            return {
+              id: `case-${c.id}`,
+              name: channelName,
+              description: `Case chat`,
+              caseId: c.id,
+              type: 'case'
+            };
+          });
+
+          // Add Ask AI channel (for mediators/lawyers)
+          const askAIChannel = {
+            id: 'ask-ai',
+            name: '🤖 Ask AI',
+            description: 'AI assistant for guidance',
+            type: 'ai'
+          };
+
+          // Add admin channel
+          const adminChannel = {
+            id: 'admin-support',
+            name: '🛟 Admin Support',
+            description: 'Contact system admin',
+            type: 'admin'
+          };
+
+          setChannels([...caseChannels, askAIChannel, adminChannel]);
+          
+          // Auto-select first channel
+          if (!activeId && caseChannels.length > 0) {
+            setActiveId(caseChannels[0].id);
+          }
+        } else {
+          // For divorcees, show their case channels
+          const casesRes = await fetch(`${API_BASE_URL}${API_ENDPOINTS.cases.list(user.user_id)}`, { headers });
+          if (!casesRes.ok) throw new Error(`HTTP ${casesRes.status}`);
+          const casesData = await casesRes.json();
+          const cases = casesData.cases || [];
+
+          const userChannels = cases.map(c => ({
+            id: `case-${c.id}`,
+            name: 'Mediator & Legal Team',
+            description: 'Your case team',
+            caseId: c.id,
+            type: 'case'
+          }));
+
+          // Add Ask AI channel
+          const askAIChannel = {
+            id: 'ask-ai',
+            name: '🤖 Ask AI',
+            description: 'AI assistant for guidance',
+            type: 'ai'
+          };
+
+          const adminChannel = {
+            id: 'admin-support',
+            name: '🛟 Admin Support',
+            description: 'Contact system admin',
+            type: 'admin'
+          };
+
+          setChannels([...userChannels, askAIChannel, adminChannel]);
+          
+          if (!activeId && userChannels.length > 0) {
+            setActiveId(userChannels[0].id);
+          }
+        }
       } catch (e) {
         console.error('Failed to load channels:', e);
       }
     };
+    
     load();
-  }, [openValue, token, activeId]);
+  }, [openValue, user, activeId]);
 
   return (
     <Dialog open={openValue} onOpenChange={setOpenValue}>

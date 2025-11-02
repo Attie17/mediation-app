@@ -2,7 +2,7 @@
 // Requirements:
 // - Inputs: email, password
 // - Submit button: "Login"
-// - On submit, call POST http://localhost:4000/auth/login with email + password
+// - On submit, call POST {API_BASE_URL}/auth/login with email + password
 // - If login succeeds, save userId in localStorage and redirect to /dashboard
 // - If login fails, show an error message in red
 // - Use useState for form values, loading, and error state
