@@ -37,6 +37,7 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
   const [byDocKey, setByDocKey] = useState({}); // { [doc_key]: Upload[] }
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState({ open: false, docKey: '' });
+  const [formsCompleted, setFormsCompleted] = useState({ assets: false, liabilities: false });
   const toast = useToast();
 
   const fetchUploads = useCallback(async () => {
@@ -64,6 +65,24 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
   useEffect(() => {
     fetchUploads();
   }, [fetchUploads]);
+
+  // Check if user has completed Assets and Liabilities forms
+  useEffect(() => {
+    const checkForms = async () => {
+      try {
+        const response = await apiFetch('/api/users/profile');
+        if (response.profileDetails) {
+          setFormsCompleted({
+            assets: !!response.profileDetails.assets && !!response.profileDetails.assetsSubmittedAt,
+            liabilities: !!response.profileDetails.liabilities && !!response.profileDetails.liabilitiesSubmittedAt
+          });
+        }
+      } catch (err) {
+        console.error('Failed to check forms completion:', err);
+      }
+    };
+    checkForms();
+  }, []);
 
   // Realtime subscription for uploads on this case (any user in case triggers refresh)
   useEffect(() => {
@@ -210,6 +229,11 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
               const accepted = latest && (latest.confirmed === true || latest.status === 'accepted' || latest.status === 'confirmed');
               const rejected = latest && latest.status === 'rejected';
               const pending = latest && !accepted && !rejected;
+              
+              // Check if this is a form-based document
+              const isFormDoc = d.key === 'assets_list' || d.key === 'liabilities_list';
+              const formCompleted = isFormDoc && (d.key === 'assets_list' ? formsCompleted.assets : formsCompleted.liabilities);
+              
               return (
                 <div key={d.key} className="flex items-center justify-between py-2.5">
                   <div className="pr-2">
@@ -220,7 +244,7 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-base" aria-hidden>
-                      {!latest ? '❌' : accepted ? '✅' : '⏳'}
+                      {isFormDoc ? (formCompleted ? '✅' : '❌') : (!latest ? '❌' : accepted ? '✅' : '⏳')}
                     </span>
                     {latest && (
                       <Button 
@@ -233,14 +257,36 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                       </Button>
                     )}
                     {role === 'divorcee' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-500 text-white border border-teal-500 font-medium" 
-                        onClick={() => setDialog({ open: true, docKey: d.key })}
-                      >
-                        {latest ? 'Replace' : 'Upload'}
-                      </Button>
+                      <>
+                        {d.key === 'assets_list' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs bg-green-600 hover:bg-green-500 text-white border border-green-500 font-medium" 
+                            onClick={() => window.location.href = '/assets'}
+                          >
+                            Complete Form
+                          </Button>
+                        ) : d.key === 'liabilities_list' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs bg-red-600 hover:bg-red-500 text-white border border-red-500 font-medium" 
+                            onClick={() => window.location.href = '/liabilities'}
+                          >
+                            Complete Form
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs bg-teal-600 hover:bg-teal-500 text-white border border-teal-500 font-medium" 
+                            onClick={() => setDialog({ open: true, docKey: d.key })}
+                          >
+                            {latest ? 'Replace' : 'Upload'}
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
