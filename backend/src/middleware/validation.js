@@ -91,7 +91,10 @@ export const validateUserRegistration = [
     .trim()
     .isLength({ min: 2, max: 100 }).withMessage('Name must be 2-100 characters')
     .matches(/^[a-zA-Z\s'-]+$/).withMessage('Name contains invalid characters'),
-  body('role').optional().isIn(['mediator', 'lawyer', 'divorcee']).withMessage('Invalid role for registration'),
+  body('role')
+    .optional()
+    .isIn(['mediator', 'lawyer', 'divorcee'])
+    .withMessage('Admin accounts cannot be self-registered. Please contact the system administrator at ds.attie.nel@gmail.com to request admin access.'),
   validateRequest
 ];
 
