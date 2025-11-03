@@ -22,6 +22,8 @@ import LoadingScreen from './components/LoadingScreen';
 const RegistrationForm = lazy(() => import('./pages/RegistrationForm'));
 const RoleSetupForm = lazy(() => import('./pages/RoleSetupNew'));
 const ComprehensiveIntakeForm = lazy(() => import('./pages/ComprehensiveIntakeForm'));
+const AssetsDeclarationForm = lazy(() => import('./pages/AssetsDeclarationForm'));
+const LiabilitiesDeclarationForm = lazy(() => import('./pages/LiabilitiesDeclarationForm'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Layout = lazy(() => import('./components/Layout'));
 const CaseDetailPage = lazy(() => import('./pages/CaseDetailPage'));
@@ -169,6 +171,8 @@ const App = () => (
           {/* Setup routes - standalone without Layout wrapper */}
           <Route path="/setup" element={<ComprehensiveIntakeForm />} />
           <Route path="/intake" element={<ComprehensiveIntakeForm />} />
+          <Route path="/assets" element={<AssetsDeclarationForm />} />
+          <Route path="/liabilities" element={<LiabilitiesDeclarationForm />} />
           <Route path="/role-setup" element={<RoleSetupForm />} />
           
           <Route element={<Layout />}>
