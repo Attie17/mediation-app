@@ -71,8 +71,9 @@ app.use(securityHeaders);
 // SECURITY: Strict origin validation in production
 const corsOptions = {
 	origin: (origin, callback) => {
-		// Allow requests with no origin (mobile apps, Postman, etc.)
-		if (!origin && !config.isProduction()) {
+		// Allow requests with no origin (health checks, curl, same-origin, mobile apps, etc.)
+		// These are safe because they can't access responses cross-origin anyway
+		if (!origin) {
 			return callback(null, true);
 		}
 		
@@ -80,11 +81,6 @@ const corsOptions = {
 		
 		// In production, strictly validate origin
 		if (config.isProduction()) {
-			if (!origin) {
-				logger.warn('Request with no origin header blocked in production');
-				return callback(new Error('Origin header required in production'));
-			}
-			
 			if (!allowedOrigins.includes(origin)) {
 				logger.warn(`Request from unauthorized origin: ${origin}`);
 				return callback(new Error(`Origin ${origin} not allowed`));
