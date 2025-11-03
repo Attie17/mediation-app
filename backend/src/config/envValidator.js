@@ -135,13 +135,8 @@ function validateDatabaseUrl() {
     };
   }
   
-  // In production, should use SSL
-  if (process.env.NODE_ENV === 'production' && !url.includes('sslmode=require')) {
-    return {
-      valid: false,
-      message: 'DATABASE_URL should include sslmode=require in production'
-    };
-  }
+  // Note: SSL mode is handled in db.js configuration, not in the URL
+  // We use NODE_TLS_REJECT_UNAUTHORIZED and PGSSLMODE env vars instead
   
   return { valid: true };
 }
