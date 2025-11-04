@@ -168,7 +168,8 @@ export default function Sidebar({ user, onLogout, onOpenChat, onCreateCase, onSh
         { label: 'Contacts', path: '/mediator/contacts', roles: ['mediator'], icon: Users },
         { label: 'All Documents', path: '/mediator/documents', roles: ['mediator'], icon: FileText },
         { label: 'Invite Participants', path: '/mediator/invite', roles: ['mediator'], icon: UserPlus },
-        { label: 'AI Assistant', action: 'openChat', roles: ['divorcee','mediator','lawyer','admin'], icon: MessageSquare },
+        { label: "Let's Talk", action: 'openChat', roles: ['divorcee'], icon: MessageSquare, highlight: true },
+        { label: 'AI Assistant', action: 'openChat', roles: ['mediator','lawyer','admin'], icon: MessageSquare },
         { label: 'Reviews', path: '/mediator/review', roles: ['mediator'], icon: AlertCircle },
         { label: 'Schedule Session', path: '/mediator/schedule', roles: ['mediator'], icon: Calendar },
         { label: 'Draft Report', path: '/mediator/reports', roles: ['mediator'], icon: FileText },
@@ -261,6 +262,8 @@ export default function Sidebar({ user, onLogout, onOpenChat, onCreateCase, onSh
                         flex items-center gap-3
                         ${item.primary 
                           ? 'bg-gradient-to-r from-teal-500 to-blue-500 text-white hover:from-teal-600 hover:to-blue-600 shadow-lg' 
+                          : item.highlight
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-md font-semibold'
                           : isActive 
                             ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' 
                             : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'

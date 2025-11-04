@@ -86,7 +86,47 @@ class AdvancedAIService {
   // Comprehensive legal analysis with South African family law expertise
   async provideLegalGuidance(query, caseContext = {}) {
     try {
+      // Extract user role from context
+      const userRole = caseContext.userRole || caseContext.user_role || 'divorcee';
+      
+      // Role-specific context for personalized responses
+      const roleContext = {
+        divorcee: {
+          perspective: "You are speaking to someone going through a divorce who may be overwhelmed and confused.",
+          communication: "For questions about communicating with others, tell them: 'Click AI Assistant in the sidebar, then select who you want to talk to (your mediator, the other divorcee, or admin).'",
+          tone: "Be empathetic, patient, and use simple language. Focus on making them feel supported.",
+          guidance: "Always provide step-by-step instructions for platform tasks. Reassure them they're not alone."
+        },
+        mediator: {
+          perspective: "You are speaking to a professional mediator managing multiple cases.",
+          communication: "For questions about communication, direct them to the ChatDrawer to message case participants.",
+          tone: "Be professional, efficient, and focused on workflow optimization.",
+          guidance: "Provide best practices and time-saving tips."
+        },
+        lawyer: {
+          perspective: "You are speaking to a legal professional reviewing mediation cases.",
+          communication: "For questions about communication, direct them to case-specific chat channels.",
+          tone: "Be professional and focus on legal workflows and document management.",
+          guidance: "Emphasize legal review processes and client communication."
+        },
+        admin: {
+          perspective: "You are speaking to a system administrator managing the platform.",
+          communication: "For questions about communication, explain organization-level messaging and user management.",
+          tone: "Be technical and comprehensive, covering system administration topics.",
+          guidance: "Focus on organization management, user administration, and system configuration."
+        }
+      };
+
+      const currentRoleContext = roleContext[userRole] || roleContext.divorcee;
+
       const systemPrompt = `You are an AI assistant specialized in South African family law, divorce mediation, AND the MediationApp platform administration.
+
+      USER ROLE CONTEXT:
+      - You are currently helping a ${userRole.toUpperCase()}
+      - ${currentRoleContext.perspective}
+      - ${currentRoleContext.communication}
+      - ${currentRoleContext.tone}
+      - ${currentRoleContext.guidance}
       
       CRITICAL RULES - HALLUCINATION PREVENTION:
       - If you don't know something, explicitly say "I don't know" or "I don't have enough information"

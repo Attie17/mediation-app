@@ -143,6 +143,7 @@ export default function AIAssistantDrawer({ isOpen, onClose, caseId, userId, use
           context: {
             caseId,
             userId,
+            userRole, // Pass user role for context-aware responses
             ...caseContext
           }
         })
