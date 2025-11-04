@@ -1,0 +1,45 @@
+# 🔴 CRITICAL FIX: DATABASE_URL Missing SSL Mode
+
+## The Problem
+
+Your DATABASE_URL in Render is missing `?sslmode=require`
+
+The envValidator checks this in production:
+```javascript
+if (process.env.NODE_ENV === 'production' && !url.includes('sslmode=require')) {
+  return { valid: false, message: 'DATABASE_URL should include sslmode=require in production' };
+}
+```
+
+---
+
+## ✅ The Fix
+
+Go to Render Dashboard → Environment Variables
+
+**Find**: `DATABASE_URL`
+
+**Change from**:
+```
+postgresql://postgres.kjmwaoainmyzbmvalizu:d8ScTSlTB6e5jmvS@aws-1-eu-west-2.pooler.supabase.com:6543/postgres
+```
+
+**Change to**:
+```
+postgresql://postgres.kjmwaoainmyzbmvalizu:d8ScTSlTB6e5jmvS@aws-1-eu-west-2.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+**Just add**: `?sslmode=require` at the end
+
+---
+
+## 🎯 After Changing
+
+1. Click "Save Changes" in Render
+2. Wait 2-3 minutes for redeploy
+3. Run: `.\test-backend.ps1`
+
+Should see:
+```
+✅ Health check passed!
+```
