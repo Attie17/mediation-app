@@ -4,7 +4,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: cd backend && rm -rf node_modules package-lock.json && npm install
+    buildCommand: cd backend && npm ci --legacy-peer-deps || npm install --legacy-peer-deps
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
