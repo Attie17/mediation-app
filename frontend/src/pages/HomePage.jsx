@@ -651,7 +651,7 @@ function HomePage() {
     setCommunicationMenuOpen(true);
   };
 
-  const handleCommunicationOptionSelected = (option, userId = null) => {
+  const handleCommunicationOptionSelected = async (option, participant = null) => {
     setCommunicationMenuOpen(false);
     
     switch(option) {
@@ -659,57 +659,38 @@ function HomePage() {
         setAiAssistantOpen(true);
         break;
       case 'mediator':
-        // Navigate to appropriate messages page based on role
-        if (user?.role === 'divorcee') {
-          navigate('/divorcee/messages?filter=mediator');
-        } else if (user?.role === 'lawyer') {
-          navigate('/lawyer/messages?filter=mediator');
-        } else if (user?.role === 'mediator') {
-          navigate('/mediator/messages?filter=mediator');
-        } else {
-          navigate('/messages?filter=mediator');
-        }
-        break;
       case 'divorcee':
       case 'other-divorcee':
-        if (user?.role === 'divorcee') {
-          navigate('/divorcee/messages?filter=divorcee');
-        } else if (user?.role === 'mediator') {
-          navigate('/mediator/messages?filter=divorcee');
-        } else if (user?.role === 'lawyer') {
-          navigate('/lawyer/messages?filter=divorcee');
-        } else {
-          navigate('/messages?filter=divorcee');
-        }
-        break;
       case 'lawyer':
-        if (user?.role === 'mediator') {
-          navigate('/mediator/messages?filter=lawyer');
-        } else if (user?.role === 'admin') {
-          navigate('/admin/messages?filter=lawyer');
+        // Navigate to messages page with participant info
+        const messagePath = user?.role === 'divorcee' ? '/divorcee/messages' :
+                           user?.role === 'mediator' ? '/mediator/messages' :
+                           user?.role === 'lawyer' ? '/lawyer/messages' :
+                           '/messages';
+        
+        if (participant) {
+          // Pass participant ID to find or create conversation
+          navigate(`${messagePath}?createWith=${participant.user_id}&participantRole=${option}`);
         } else {
-          navigate('/messages?filter=lawyer');
+          navigate(`${messagePath}?filter=${option}`);
         }
         break;
       case 'group':
       case 'group-of-3':
-        if (user?.role === 'divorcee') {
-          navigate('/divorcee/messages?filter=group');
-        } else if (user?.role === 'mediator') {
-          navigate('/mediator/messages?filter=group');
-        } else {
-          navigate('/messages?filter=group');
-        }
+        const groupPath = user?.role === 'divorcee' ? '/divorcee/messages' :
+                         user?.role === 'mediator' ? '/mediator/messages' :
+                         '/messages';
+        navigate(`${groupPath}?filter=group`);
         break;
       case 'admin':
         // Everyone can contact admin
-        const basePath = user?.role ? `/${user.role}/messages` : '/messages';
-        navigate(`${basePath}?filter=admin`);
+        const adminPath = user?.role ? `/${user.role}/messages` : '/messages';
+        navigate(`${adminPath}?filter=admin`);
         break;
       case 'user':
         // Admin selected specific user
-        if (userId) {
-          navigate(`/admin/messages?userId=${userId}`);
+        if (participant?.user_id) {
+          navigate(`/admin/messages?userId=${participant.user_id}`);
         }
         break;
       case 'broadcast':
@@ -903,6 +884,7 @@ function HomePage() {
             onClose={() => setCommunicationMenuOpen(false)}
             onSelectOption={handleCommunicationOptionSelected}
             userRole={user.role}
+            userId={user.user_id || user.id}
           />
         )}
       </div>

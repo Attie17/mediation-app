@@ -2,10 +2,54 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Users, UsersRound, Shield, Sparkles, X, ChevronDown } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
 
-export default function CommunicationMenu({ isOpen, onClose, onSelectOption, userRole }) {
+export default function CommunicationMenu({ isOpen, onClose, onSelectOption, userRole, userId }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [caseParticipants, setCaseParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Fetch case participants when menu opens
+  useEffect(() => {
+    if (isOpen && userRole !== 'admin') {
+      fetchCaseParticipants();
+    }
+  }, [isOpen, userRole]);
+
+  const fetchCaseParticipants = async () => {
+    try {
+      const caseId = localStorage.getItem('activeCaseId');
+      if (!caseId) return;
+
+      const response = await apiFetch(`/api/cases/${caseId}/participants`);
+      setCaseParticipants(response.participants || []);
+    } catch (error) {
+      console.error('Failed to fetch case participants:', error);
+      setCaseParticipants([]);
+    }
+  };
+
+  // Get participant by role
+  const getParticipantByRole = (role) => {
+    return caseParticipants.find(p => p.role === role && p.user_id !== userId);
+  };
+
+  // Get all participants of a role (excluding self)
+  const getParticipantsByRole = (role) => {
+    return caseParticipants.filter(p => p.role === role && p.user_id !== userId);
+  };
+
+  // Format participant name
+  const formatParticipantName = (participant) => {
+    if (!participant) return null;
+    
+    const name = participant.first_name && participant.last_name
+      ? `${participant.first_name} ${participant.last_name}`
+      : participant.email?.split('@')[0] || 'User';
+    
+    const roleLabel = participant.role?.charAt(0).toUpperCase() + participant.role?.slice(1) || 'Participant';
+    
+    return `${name} (${roleLabel})`;
+  };
 
   if (!isOpen) return null;
 
@@ -13,22 +57,27 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
   const getRoleOptions = () => {
     switch(userRole) {
       case 'divorcee':
+        const mediator = getParticipantByRole('mediator');
+        const otherDivorcee = getParticipantByRole('divorcee');
+        
         return [
           {
             id: 'mediator',
-            label: 'Your Mediator',
+            label: formatParticipantName(mediator) || 'Your Mediator',
             description: 'Direct message',
             icon: Shield,
             color: 'from-blue-500 to-blue-600',
-            action: () => onSelectOption('mediator')
+            action: () => onSelectOption('mediator', mediator),
+            disabled: !mediator
           },
           {
             id: 'other-divorcee',
-            label: 'Other Party',
+            label: formatParticipantName(otherDivorcee) || 'Other Party',
             description: 'Private chat',
             icon: MessageSquare,
             color: 'from-purple-500 to-purple-600',
-            action: () => onSelectOption('other-divorcee')
+            action: () => onSelectOption('other-divorcee', otherDivorcee),
+            disabled: !otherDivorcee
           },
           {
             id: 'group-of-3',
@@ -36,7 +85,8 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'With mediator & other party',
             icon: UsersRound,
             color: 'from-green-500 to-green-600',
-            action: () => onSelectOption('group-of-3')
+            action: () => onSelectOption('group-of-3', null),
+            disabled: !mediator || !otherDivorcee
           },
           {
             id: 'admin',
@@ -44,7 +94,7 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'Technical help',
             icon: Users,
             color: 'from-orange-500 to-orange-600',
-            action: () => onSelectOption('admin')
+            action: () => onSelectOption('admin', null)
           },
           {
             id: 'ai',
@@ -52,43 +102,59 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'Get instant answers',
             icon: Sparkles,
             color: 'from-cyan-500 to-cyan-600',
-            action: () => onSelectOption('ai')
+            action: () => onSelectOption('ai', null)
           }
-        ];
+        ].filter(opt => !opt.disabled);
 
       case 'mediator':
-        return [
-          {
-            id: 'divorcees',
-            label: 'Message Divorcees',
-            description: 'Select a case participant',
-            icon: Users,
+        const divorcees = getParticipantsByRole('divorcee');
+        const lawyers = getParticipantsByRole('lawyer');
+        const mediatorOptions = [];
+        
+        // Add individual divorcees
+        divorcees.forEach((div, idx) => {
+          mediatorOptions.push({
+            id: `divorcee-${idx}`,
+            label: formatParticipantName(div),
+            description: 'Direct message',
+            icon: MessageSquare,
             color: 'from-purple-500 to-purple-600',
-            action: () => onSelectOption('divorcee')
-          },
-          {
+            action: () => onSelectOption('divorcee', div)
+          });
+        });
+        
+        // Add group option if multiple divorcees
+        if (divorcees.length >= 2) {
+          mediatorOptions.push({
             id: 'group',
             label: 'Group Chat',
-            description: 'Chat with all case parties',
+            description: 'All case parties',
             icon: UsersRound,
             color: 'from-green-500 to-green-600',
-            action: () => onSelectOption('group')
-          },
-          {
-            id: 'lawyers',
-            label: 'Message Lawyers',
-            description: 'Communicate with legal counsel',
+            action: () => onSelectOption('group', null)
+          });
+        }
+        
+        // Add lawyers
+        lawyers.forEach((lawyer, idx) => {
+          mediatorOptions.push({
+            id: `lawyer-${idx}`,
+            label: formatParticipantName(lawyer),
+            description: 'Legal counsel',
             icon: Shield,
             color: 'from-blue-500 to-blue-600',
-            action: () => onSelectOption('lawyer')
-          },
+            action: () => onSelectOption('lawyer', lawyer)
+          });
+        });
+        
+        mediatorOptions.push(
           {
             id: 'admin',
             label: 'Contact Admin',
             description: 'Platform support',
             icon: Users,
             color: 'from-orange-500 to-orange-600',
-            action: () => onSelectOption('admin')
+            action: () => onSelectOption('admin', null)
           },
           {
             id: 'ai',
@@ -96,27 +162,34 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'Process guidance',
             icon: Sparkles,
             color: 'from-cyan-500 to-cyan-600',
-            action: () => onSelectOption('ai')
+            action: () => onSelectOption('ai', null)
           }
-        ];
+        );
+        
+        return mediatorOptions;
 
       case 'lawyer':
+        const client = getParticipantByRole('divorcee');
+        const caseMediator = getParticipantByRole('mediator');
+        
         return [
           {
             id: 'client',
-            label: 'Your Client',
+            label: formatParticipantName(client) || 'Your Client',
             description: 'Private communication',
             icon: MessageSquare,
             color: 'from-purple-500 to-purple-600',
-            action: () => onSelectOption('divorcee')
+            action: () => onSelectOption('divorcee', client),
+            disabled: !client
           },
           {
             id: 'mediator',
-            label: 'Case Mediator',
-            description: 'Coordinate with mediator',
+            label: formatParticipantName(caseMediator) || 'Case Mediator',
+            description: 'Coordinate',
             icon: Shield,
             color: 'from-blue-500 to-blue-600',
-            action: () => onSelectOption('mediator')
+            action: () => onSelectOption('mediator', caseMediator),
+            disabled: !caseMediator
           },
           {
             id: 'admin',
@@ -124,7 +197,7 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'Platform support',
             icon: Users,
             color: 'from-orange-500 to-orange-600',
-            action: () => onSelectOption('admin')
+            action: () => onSelectOption('admin', null)
           },
           {
             id: 'ai',
@@ -132,9 +205,9 @@ export default function CommunicationMenu({ isOpen, onClose, onSelectOption, use
             description: 'Legal workflow help',
             icon: Sparkles,
             color: 'from-cyan-500 to-cyan-600',
-            action: () => onSelectOption('ai')
+            action: () => onSelectOption('ai', null)
           }
-        ];
+        ].filter(opt => !opt.disabled);
 
       case 'admin':
         return [

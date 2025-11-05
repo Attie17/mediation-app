@@ -22,18 +22,71 @@ export default function MessagesPage() {
   // Get active case from localStorage or use default test case
   const caseId = localStorage.getItem('activeCaseId') || '3bcb2937-0e55-451a-a9fd-659187af84d4';
   
-  // Get filter from URL params
+  // Get URL params
   const filter = searchParams.get('filter');
+  const createWith = searchParams.get('createWith'); // Participant user_id to create conversation with
+  const participantRole = searchParams.get('participantRole'); // Role type (mediator, divorcee, etc)
   
   useEffect(() => {
     fetchConversations();
   }, [caseId]);
+
+  // Handle auto-create conversation when createWith param exists
+  useEffect(() => {
+    if (createWith && conversations.length > 0) {
+      handleCreateOrFindConversation();
+    }
+  }, [createWith, conversations]);
   
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
     }
   }, [selectedConversation]);
+
+  async function handleCreateOrFindConversation() {
+    try {
+      // Look for existing conversation with this participant
+      const existing = conversations.find(c => 
+        c.participants?.some(p => p.user_id === createWith)
+      );
+
+      if (existing) {
+        // Conversation exists, select it
+        setSelectedConversation(existing);
+        setSearchParams({}); // Clear params
+        return;
+      }
+
+      // Create new conversation
+      const conversationType = participantRole === 'mediator' ? 'divorcee_to_mediator' :
+                              participantRole === 'divorcee' ? 'divorcee_to_divorcee' :
+                              participantRole === 'lawyer' ? 'divorcee_to_lawyer' :
+                              'private';
+
+      const response = await apiFetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_id: caseId,
+          conversation_type: conversationType,
+          participant_ids: [user.user_id, createWith]
+        })
+      });
+
+      // Refresh conversations and select the new one
+      await fetchConversations();
+      const newConv = response.conversation;
+      if (newConv) {
+        setSelectedConversation(newConv);
+      }
+      
+      setSearchParams({}); // Clear params
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      setError('Failed to start conversation. Please try again.');
+    }
+  }
   
   async function fetchConversations() {
     try {
