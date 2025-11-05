@@ -4,7 +4,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: chmod +x backend/prebuild.sh && backend/prebuild.sh && cd backend && npm install --legacy-peer-deps
+    buildCommand: cd backend && rm -rf node_modules && npm install --legacy-peer-deps --no-cache
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
