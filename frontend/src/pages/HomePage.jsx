@@ -13,7 +13,7 @@ import CreateCaseModal from "../components/CreateCaseModal";
 import PrivacyModal from "../components/modals/PrivacyModal";
 import ProcessGuideModal from "../components/modals/ProcessGuideModal";
 import FAQModal from "../components/modals/FAQModal";
-import CommunicationMenu from "../components/divorcee/CommunicationMenu";
+import CommunicationMenu from "../components/communication/CommunicationMenu";
 
 function HamburgerMenuOverlay({ open, onClose, user, navigate, onLogout }) {
   const caseId = localStorage.getItem('activeCaseId');
@@ -647,16 +647,11 @@ function HomePage() {
   };
 
   const handleOpenChat = () => {
-    // For divorcees, show communication menu
-    if (user?.role === 'divorcee') {
-      setCommunicationMenuOpen(true);
-    } else {
-      // For other roles, open AI assistant directly
-      setAiAssistantOpen(true);
-    }
+    // All roles get the communication menu now
+    setCommunicationMenuOpen(true);
   };
 
-  const handleCommunicationOptionSelected = (option) => {
+  const handleCommunicationOptionSelected = (option, userId = null) => {
     setCommunicationMenuOpen(false);
     
     switch(option) {
@@ -664,20 +659,62 @@ function HomePage() {
         setAiAssistantOpen(true);
         break;
       case 'mediator':
-        // Navigate to messages with mediator filter
-        navigate('/divorcee/messages?filter=mediator');
+        // Navigate to appropriate messages page based on role
+        if (user?.role === 'divorcee') {
+          navigate('/divorcee/messages?filter=mediator');
+        } else if (user?.role === 'lawyer') {
+          navigate('/lawyer/messages?filter=mediator');
+        } else if (user?.role === 'mediator') {
+          navigate('/mediator/messages?filter=mediator');
+        } else {
+          navigate('/messages?filter=mediator');
+        }
         break;
+      case 'divorcee':
       case 'other-divorcee':
-        // Navigate to messages with other divorcee filter
-        navigate('/divorcee/messages?filter=divorcee');
+        if (user?.role === 'divorcee') {
+          navigate('/divorcee/messages?filter=divorcee');
+        } else if (user?.role === 'mediator') {
+          navigate('/mediator/messages?filter=divorcee');
+        } else if (user?.role === 'lawyer') {
+          navigate('/lawyer/messages?filter=divorcee');
+        } else {
+          navigate('/messages?filter=divorcee');
+        }
         break;
+      case 'lawyer':
+        if (user?.role === 'mediator') {
+          navigate('/mediator/messages?filter=lawyer');
+        } else if (user?.role === 'admin') {
+          navigate('/admin/messages?filter=lawyer');
+        } else {
+          navigate('/messages?filter=lawyer');
+        }
+        break;
+      case 'group':
       case 'group-of-3':
-        // Navigate to group conversation
-        navigate('/divorcee/messages?filter=group');
+        if (user?.role === 'divorcee') {
+          navigate('/divorcee/messages?filter=group');
+        } else if (user?.role === 'mediator') {
+          navigate('/mediator/messages?filter=group');
+        } else {
+          navigate('/messages?filter=group');
+        }
         break;
       case 'admin':
-        // Navigate to admin support
-        navigate('/divorcee/messages?filter=admin');
+        // Everyone can contact admin
+        const basePath = user?.role ? `/${user.role}/messages` : '/messages';
+        navigate(`${basePath}?filter=admin`);
+        break;
+      case 'user':
+        // Admin selected specific user
+        if (userId) {
+          navigate(`/admin/messages?userId=${userId}`);
+        }
+        break;
+      case 'broadcast':
+        // Admin broadcast feature
+        navigate('/admin/broadcast');
         break;
       default:
         console.warn('Unknown communication option:', option);
@@ -859,12 +896,13 @@ function HomePage() {
         <ProcessGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
         <FAQModal isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
         
-        {/* Communication Menu for Divorcees */}
-        {user?.role === 'divorcee' && (
+        {/* Communication Menu for All Roles */}
+        {user && (
           <CommunicationMenu 
             isOpen={communicationMenuOpen}
             onClose={() => setCommunicationMenuOpen(false)}
             onSelectOption={handleCommunicationOptionSelected}
+            userRole={user.role}
           />
         )}
       </div>
