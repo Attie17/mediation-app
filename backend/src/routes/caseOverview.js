@@ -9,10 +9,24 @@ router.use(authenticateUser);
 const asCamel = (row) => row;
 
 /**
- * Resolve case ID - accept either UUID or short_id (integer)
+ * Resolve case ID - accept either UUID, short_id (integer), or 'my-case' alias
  * Returns { id: uuid, short_id: number } or null if not found
  */
-async function resolveCaseId(caseIdInput) {
+async function resolveCaseId(caseIdInput, userId) {
+  // Handle special 'my-case' alias - fetch user's active case
+  if (caseIdInput === 'my-case' && userId) {
+    const result = await pool.query(
+      `SELECT c.id, c.short_id 
+       FROM public.cases c
+       JOIN public.case_participants cp ON c.id = cp.case_id
+       WHERE cp.user_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+  
   // Check if it looks like a UUID (contains hyphens)
   const isUUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(caseIdInput);
   
@@ -24,9 +38,13 @@ async function resolveCaseId(caseIdInput) {
     return result.rows[0] || null;
   } else {
     // Treat as short_id (integer)
+    const shortId = parseInt(caseIdInput, 10);
+    if (isNaN(shortId)) {
+      return null; // Invalid case ID format
+    }
     const result = await pool.query(
       'SELECT id, short_id FROM public.cases WHERE short_id = $1',
-      [parseInt(caseIdInput, 10)]
+      [shortId]
     );
     return result.rows[0] || null;
   }
@@ -38,13 +56,14 @@ async function resolveCaseId(caseIdInput) {
  */
 router.get('/:caseId', async (req, res) => {
   const { caseId } = req.params;
-  console.log('[cases:overview] enter', { caseId, user: req.user?.user_id });
+  const userId = req.user?.id || req.user?.user_id;
+  console.log('[cases:overview] enter', { caseId, userId });
   
   try {
-    // Resolve case ID (handles both UUID and short_id)
-    const resolved = await resolveCaseId(caseId);
+    // Resolve case ID (handles UUID, short_id, and 'my-case' alias)
+    const resolved = await resolveCaseId(caseId, userId);
     if (!resolved) {
-      console.log('[cases:overview] case not found', { caseId });
+      console.log('[cases:overview] case not found', { caseId, userId });
       return res.status(404).json({ 
         ok: false, 
         error: { code: 'CASE_NOT_FOUND', message: 'Case not found' }
