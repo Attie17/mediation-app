@@ -6,11 +6,12 @@ import MessageInput from '../../components/messages/MessageInput';
 import AIMessageAssistant from '../../components/messages/AIMessageAssistant';
 import ConversationsList from '../../components/messages/ConversationsList';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -20,6 +21,9 @@ export default function MessagesPage() {
   
   // Get active case from localStorage or use default test case
   const caseId = localStorage.getItem('activeCaseId') || '3bcb2937-0e55-451a-a9fd-659187af84d4';
+  
+  // Get filter from URL params
+  const filter = searchParams.get('filter');
   
   useEffect(() => {
     fetchConversations();
@@ -38,9 +42,51 @@ export default function MessagesPage() {
       const data = await apiFetch(`/api/conversations/case/${caseId}`);
       setConversations(data.conversations || []);
       
-      // Auto-select first conversation if available
-      if (data.conversations && data.conversations.length > 0 && !selectedConversation) {
-        setSelectedConversation(data.conversations[0]);
+      // Smart conversation selection based on filter
+      if (data.conversations && data.conversations.length > 0) {
+        let conversationToSelect = null;
+        
+        if (filter) {
+          // Filter-based selection (from Let's Talk menu)
+          switch(filter) {
+            case 'mediator':
+              conversationToSelect = data.conversations.find(c => 
+                c.conversation_type === 'divorcee_to_mediator' ||
+                c.participants?.some(p => p.role === 'mediator')
+              );
+              break;
+            case 'divorcee':
+              conversationToSelect = data.conversations.find(c => 
+                c.conversation_type === 'divorcee_to_divorcee' ||
+                (c.participants?.filter(p => p.role === 'divorcee').length === 2)
+              );
+              break;
+            case 'group':
+              conversationToSelect = data.conversations.find(c => 
+                c.conversation_type === 'group' ||
+                c.participants?.length >= 3
+              );
+              break;
+            case 'admin':
+              conversationToSelect = data.conversations.find(c => 
+                c.conversation_type === 'admin_support' ||
+                c.participants?.some(p => p.role === 'admin')
+              );
+              break;
+          }
+          
+          // Clear filter after processing
+          setSearchParams({});
+        }
+        
+        // If no filter match or no filter, use first conversation or keep selection
+        if (!conversationToSelect && !selectedConversation) {
+          conversationToSelect = data.conversations[0];
+        }
+        
+        if (conversationToSelect) {
+          setSelectedConversation(conversationToSelect);
+        }
       }
       
       setLoading(false);

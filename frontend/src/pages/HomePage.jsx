@@ -13,6 +13,7 @@ import CreateCaseModal from "../components/CreateCaseModal";
 import PrivacyModal from "../components/modals/PrivacyModal";
 import ProcessGuideModal from "../components/modals/ProcessGuideModal";
 import FAQModal from "../components/modals/FAQModal";
+import CommunicationMenu from "../components/divorcee/CommunicationMenu";
 
 function HamburgerMenuOverlay({ open, onClose, user, navigate, onLogout }) {
   const caseId = localStorage.getItem('activeCaseId');
@@ -638,6 +639,7 @@ function HomePage() {
   const [showPrivacy, setShowPrivacy] = React.useState(false);
   const [showGuide, setShowGuide] = React.useState(false);
   const [showFAQ, setShowFAQ] = React.useState(false);
+  const [communicationMenuOpen, setCommunicationMenuOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -645,7 +647,41 @@ function HomePage() {
   };
 
   const handleOpenChat = () => {
-    setAiAssistantOpen(true);
+    // For divorcees, show communication menu
+    if (user?.role === 'divorcee') {
+      setCommunicationMenuOpen(true);
+    } else {
+      // For other roles, open AI assistant directly
+      setAiAssistantOpen(true);
+    }
+  };
+
+  const handleCommunicationOptionSelected = (option) => {
+    setCommunicationMenuOpen(false);
+    
+    switch(option) {
+      case 'ai':
+        setAiAssistantOpen(true);
+        break;
+      case 'mediator':
+        // Navigate to messages with mediator filter
+        navigate('/divorcee/messages?filter=mediator');
+        break;
+      case 'other-divorcee':
+        // Navigate to messages with other divorcee filter
+        navigate('/divorcee/messages?filter=divorcee');
+        break;
+      case 'group-of-3':
+        // Navigate to group conversation
+        navigate('/divorcee/messages?filter=group');
+        break;
+      case 'admin':
+        // Navigate to admin support
+        navigate('/divorcee/messages?filter=admin');
+        break;
+      default:
+        console.warn('Unknown communication option:', option);
+    }
   };
 
   const handleCreateCase = () => {
@@ -822,6 +858,15 @@ function HomePage() {
         <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
         <ProcessGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
         <FAQModal isOpen={showFAQ} onClose={() => setShowFAQ(false)} />
+        
+        {/* Communication Menu for Divorcees */}
+        {user?.role === 'divorcee' && (
+          <CommunicationMenu 
+            isOpen={communicationMenuOpen}
+            onClose={() => setCommunicationMenuOpen(false)}
+            onSelectOption={handleCommunicationOptionSelected}
+          />
+        )}
       </div>
     );
   }
