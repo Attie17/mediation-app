@@ -45,6 +45,7 @@ import caseAssignmentsRouter from './routes/caseAssignments.js';
 import invitationsRouter from './routes/invitations.js';
 import casesListRouter from './routes/caseslist.js';
 import healthRouter from './routes/health.js';
+import riskAssessmentRouter from './routes/riskAssessment.js';
 import { authenticateUser } from './middleware/authenticateUser.js';
 import devAuth from './middleware/devAuth.js';
 import { securityHeaders, apiLimiter, requestSizeLimiter } from './middleware/security.js';
@@ -225,6 +226,7 @@ app.use('/api/caseslist', authenticateUser, casesListRouter);
 logger.debug('Case routes mounted at /api/cases');
 
 app.use('/api/users', usersRouter);
+app.use('/api/users', riskAssessmentRouter);
 app.use('/api/admin/users', usersRouter);
 app.use('/api/admin', adminRouter);
 logger.debug('User and admin routes mounted');

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/apiClient';
-import { ChevronRight, ChevronLeft, Check, User, Home, Heart, Users, DollarSign, FileText, Target } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, User, Home, Heart, Users, DollarSign, FileText, Target, Shield } from 'lucide-react';
 
 const STEPS = [
   { id: 1, title: 'Personal Info', icon: User, description: 'Your basic details' },
   { id: 2, title: 'Address & Work', icon: Home, description: 'Where you live and work' },
   { id: 3, title: 'Marriage Details', icon: Heart, description: 'About your marriage' },
   { id: 4, title: 'Children', icon: Users, description: 'Information about children' },
+  { id: 4.5, title: 'Safety & Wellbeing', icon: Shield, description: 'Confidential assessment' },
   { id: 5, title: 'Financial', icon: DollarSign, description: 'Assets and support' },
   { id: 6, title: 'Legal', icon: FileText, description: 'Attorney information' },
   { id: 7, title: 'Goals', icon: Target, description: 'What you hope to achieve' }
@@ -62,6 +63,19 @@ export default function ComprehensiveIntakeForm() {
     hasChildren: '',
     numberOfChildren: 0,
     children: [],
+    
+    // Step 4.5: Safety & Wellbeing Assessment (IPV Screening)
+    safetyFearDuringConflict: '',
+    safetyPhysicalViolence: '',
+    safetyThreatsOrIntimidation: '',
+    safetyFinancialControl: '',
+    safetySocialIsolation: '',
+    safetyDecisionControl: '',
+    safetyEmotionalAbuse: '',
+    safetyChildrenWitness: '',
+    safetyCurrentlySafe: '',
+    safetyNeedSupport: '',
+    safetyAdditionalConcerns: '',
     
     // Step 5: Financial Information
     monthlyIncome: '',
@@ -159,6 +173,30 @@ export default function ComprehensiveIntakeForm() {
           return false;
         }
         break;
+      case 4.5:
+        // Safety assessment - require at least 7 of 10 questions answered
+        const safetyFields = [
+          'safetyFearDuringConflict',
+          'safetyPhysicalViolence',
+          'safetyThreatsOrIntimidation',
+          'safetyFinancialControl',
+          'safetySocialIsolation',
+          'safetyDecisionControl',
+          'safetyEmotionalAbuse',
+          'safetyCurrentlySafe',
+          'safetyNeedSupport'
+        ];
+        // Include safetyChildrenWitness only if they have children
+        if (formData.hasChildren === 'yes') {
+          safetyFields.push('safetyChildrenWitness');
+        }
+        const answeredCount = safetyFields.filter(field => formData[field] && formData[field] !== '').length;
+        const requiredCount = formData.hasChildren === 'yes' ? 8 : 7;
+        if (answeredCount < requiredCount) {
+          setError(`Please answer at least ${requiredCount} of the safety assessment questions`);
+          return false;
+        }
+        break;
     }
     setError('');
     return true;
@@ -188,6 +226,33 @@ export default function ComprehensiveIntakeForm() {
         return;
       }
 
+      // First, submit risk assessment if safety data exists
+      const hasSafetyData = formData.safetyFearDuringConflict || 
+                            formData.safetyPhysicalViolence ||
+                            formData.safetyThreatsOrIntimidation;
+      
+      if (hasSafetyData) {
+        const safetyAssessment = {
+          safetyFearDuringConflict: formData.safetyFearDuringConflict,
+          safetyPhysicalViolence: formData.safetyPhysicalViolence,
+          safetyThreatsOrIntimidation: formData.safetyThreatsOrIntimidation,
+          safetyFinancialControl: formData.safetyFinancialControl,
+          safetySocialIsolation: formData.safetySocialIsolation,
+          safetyDecisionControl: formData.safetyDecisionControl,
+          safetyEmotionalAbuse: formData.safetyEmotionalAbuse,
+          safetyChildrenWitness: formData.safetyChildrenWitness,
+          safetyCurrentlySafe: formData.safetyCurrentlySafe,
+          safetyNeedSupport: formData.safetyNeedSupport,
+          safetyAdditionalConcerns: formData.safetyAdditionalConcerns
+        };
+
+        await apiFetch('/api/users/risk-assessment', {
+          method: 'POST',
+          body: JSON.stringify(safetyAssessment)
+        });
+      }
+
+      // Then submit the main profile
       const payload = {
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         phone: formData.cellPhone || formData.homePhone || undefined,
@@ -752,6 +817,279 @@ export default function ComprehensiveIntakeForm() {
                 ))}
               </>
             )}
+          </div>
+        );
+
+      case 4.5:
+        return (
+          <div className="space-y-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <Shield className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Safety & Wellbeing Assessment</h3>
+                  <p className="text-slate-300 text-sm mb-2">
+                    These questions help us understand if additional support or process adaptations would benefit your case.
+                    Your responses are confidential and will NOT be shared with the other party.
+                  </p>
+                  <p className="text-blue-300 text-sm font-medium">
+                    🔒 Your safety is our priority. Answer honestly so we can provide the best support.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              {/* Question 1: Fear during conflicts */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  1. Have you ever felt afraid of your partner during conflicts or disagreements?
+                </label>
+                <div className="space-y-2">
+                  {['Never', 'Rarely', 'Sometimes', 'Often', 'Always'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyFearDuringConflict"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyFearDuringConflict === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 2: Physical violence */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  2. Have you experienced physical violence or threats of physical violence from your partner?
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: 'no', label: 'No, never' },
+                    { value: 'past', label: 'Yes, in the past (not recently)' },
+                    { value: 'ongoing', label: 'Yes, it is ongoing or recent' },
+                    { value: 'prefer_not_say', label: 'Prefer not to say' }
+                  ].map(option => (
+                    <label key={option.value} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyPhysicalViolence"
+                        value={option.value}
+                        checked={formData.safetyPhysicalViolence === option.value}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 3: Threats or intimidation */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  3. Does your partner use threats, intimidation, or aggressive behavior to control you?
+                </label>
+                <div className="space-y-2">
+                  {['No', 'Occasionally', 'Frequently', 'Unsure'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyThreatsOrIntimidation"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyThreatsOrIntimidation === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 4: Financial control */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  4. Does your partner control finances, preventing you from accessing money or making financial decisions?
+                </label>
+                <div className="space-y-2">
+                  {['No', 'Sometimes', 'Yes, significantly', 'Not applicable'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyFinancialControl"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyFinancialControl === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 5: Social isolation */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  5. Does your partner isolate you from family, friends, or support networks?
+                </label>
+                <div className="space-y-2">
+                  {['No', 'Sometimes', 'Frequently', 'Not sure'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetySocialIsolation"
+                        value={option.toLowerCase()}
+                        checked={formData.safetySocialIsolation === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 6: Decision control */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  6. Does your partner make all major decisions without your input or disregard your opinions?
+                </label>
+                <div className="space-y-2">
+                  {['No', 'Sometimes', 'Most of the time', 'Always'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyDecisionControl"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyDecisionControl === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 7: Emotional abuse */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  7. Does your partner use insults, humiliation, or emotional manipulation to hurt you?
+                </label>
+                <div className="space-y-2">
+                  {['Never', 'Rarely', 'Sometimes', 'Often', 'Very often'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyEmotionalAbuse"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyEmotionalAbuse === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 8: Children witness */}
+              {formData.hasChildren === 'yes' && (
+                <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                  <label className="block text-sm font-medium text-slate-200 mb-3">
+                    8. Have your children witnessed conflicts or violence between you and your partner?
+                  </label>
+                  <div className="space-y-2">
+                    {['No', 'Once or twice', 'Several times', 'Frequently', 'Prefer not to say'].map(option => (
+                      <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="safetyChildrenWitness"
+                          value={option.toLowerCase()}
+                          checked={formData.safetyChildrenWitness === option.toLowerCase()}
+                          onChange={handleChange}
+                          className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                        />
+                        <span className="text-slate-300">{option}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Question 9: Currently safe */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  9. Do you currently feel safe in your living situation?
+                </label>
+                <div className="space-y-2">
+                  {['Yes, I feel safe', 'Mostly safe', 'Sometimes unsafe', 'No, I do not feel safe', 'Unsure'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyCurrentlySafe"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyCurrentlySafe === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 10: Need support */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  10. Would you like information about additional support services (counseling, legal aid, safe housing)?
+                </label>
+                <div className="space-y-2">
+                  {['Yes, please', 'Maybe later', 'No, thank you', 'Already receiving support'].map(option => (
+                    <label key={option} className="flex items-center gap-3 p-3 rounded hover:bg-slate-700/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="safetyNeedSupport"
+                        value={option.toLowerCase()}
+                        checked={formData.safetyNeedSupport === option.toLowerCase()}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-slate-300">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional concerns - text area */}
+              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  Additional Safety Concerns (Optional)
+                </label>
+                <textarea
+                  name="safetyAdditionalConcerns"
+                  value={formData.safetyAdditionalConcerns}
+                  onChange={handleChange}
+                  rows={4}
+                  placeholder="Share any other safety concerns or context that would help us support you better..."
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+            </div>
+
+            {/* Support resources notice */}
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-6">
+              <p className="text-yellow-300 text-sm">
+                <strong>If you are in immediate danger:</strong> Please contact emergency services at <strong>10111</strong> or the 
+                GBV Command Centre at <strong>0800 428 428</strong> (toll-free, 24/7).
+              </p>
+            </div>
           </div>
         );
 
