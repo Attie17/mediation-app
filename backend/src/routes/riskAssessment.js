@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import { pool } from '../db.js';
+import { authenticateUser } from '../middleware/authenticateUser.js';
+
 const router = express.Router();
-const pool = require('../config/database');
-const authenticateUser = require('../middleware/authenticateUser');
 
 /**
  * Calculate IPV (Intimate Partner Violence) risk flags
@@ -360,4 +361,4 @@ router.get('/:userId/risk-assessment', authenticateUser, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

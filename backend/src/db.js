@@ -14,7 +14,14 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const databaseUrl = process.env.DATABASE_URL;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create Supabase client with validation
+let supabase;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+  console.warn('⚠️  Supabase credentials missing - some features may not work');
+  supabase = null;
+}
 
 // Configure SSL for production Supabase connections
 // Supabase pooler requires SSL but uses self-signed certificates
