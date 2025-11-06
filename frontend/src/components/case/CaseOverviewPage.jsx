@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import DashboardFrame from '../DashboardFrame';
 import InviteParticipantModal from '../InviteParticipantModal';
-import { UserPlus, ArrowLeft, Calendar, Clock, Video, MapPin } from 'lucide-react';
+import { UserPlus, ArrowLeft, Calendar, Clock, Video, MapPin, Shield, AlertTriangle, Info } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
 
 export default function CaseOverviewPage() {
@@ -16,6 +16,7 @@ export default function CaseOverviewPage() {
   const [error, setError] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [riskAssessments, setRiskAssessments] = useState({});
 
   useEffect(() => {
     const userId = user?.user_id || user?.id;
@@ -24,6 +25,26 @@ export default function CaseOverviewPage() {
       fetchUpcomingSessions();
     }
   }, [caseId, user?.user_id, user?.id]);
+
+  // Fetch risk assessments for participants (mediators only)
+  const fetchRiskAssessments = async (participantsList) => {
+    if (user?.role !== 'mediator' && user?.role !== 'admin') return;
+
+    const assessments = {};
+    for (const participant of participantsList) {
+      if (participant.role === 'divorcee') {
+        try {
+          const data = await apiFetch(`/api/users/${participant.user_id}/risk-assessment`);
+          if (data?.ok && data?.assessment) {
+            assessments[participant.user_id] = data.assessment;
+          }
+        } catch (err) {
+          console.error(`Error fetching risk assessment for ${participant.user_id}:`, err);
+        }
+      }
+    }
+    setRiskAssessments(assessments);
+  };
 
   const fetchUpcomingSessions = async () => {
     try {
@@ -65,6 +86,11 @@ export default function CaseOverviewPage() {
       const data = await apiFetch(`/api/cases/${caseId}?userId=${userId}&userRole=${userRole}`);
       
       setCaseData(data);
+
+      // Fetch risk assessments for participants if mediator/admin
+      if (data?.participants) {
+        await fetchRiskAssessments(data.participants);
+      }
     } catch (err) {
       console.error('Error fetching case data:', err);
       setError(err.message);
@@ -174,6 +200,133 @@ export default function CaseOverviewPage() {
             />
           </div>
         </div>
+
+        {/* Risk Assessment Alerts (Mediators Only) */}
+        {(user?.role === 'mediator' || user?.role === 'admin') && Object.keys(riskAssessments).length > 0 && (
+          <div className="space-y-3">
+            {Object.entries(riskAssessments).map(([userId, assessment]) => {
+              const participant = participants?.find(p => p.user_id.toString() === userId);
+              const participantName = participant ? `${participant.first_name} ${participant.last_name}` : 'Participant';
+              
+              // Determine risk level styling
+              const getRiskStyle = (level) => {
+                switch (level) {
+                  case 'high_risk':
+                    return {
+                      bg: 'bg-red-500/10',
+                      border: 'border-red-500/30',
+                      text: 'text-red-300',
+                      icon: AlertTriangle,
+                      label: 'High Risk',
+                      description: 'Shuttle mediation strongly recommended'
+                    };
+                  case 'moderate_risk':
+                    return {
+                      bg: 'bg-yellow-500/10',
+                      border: 'border-yellow-500/30',
+                      text: 'text-yellow-300',
+                      icon: AlertTriangle,
+                      label: 'Moderate Risk',
+                      description: 'Process adaptations recommended'
+                    };
+                  default:
+                    return {
+                      bg: 'bg-blue-500/10',
+                      border: 'border-blue-500/30',
+                      text: 'text-blue-300',
+                      icon: Info,
+                      label: 'Standard Process',
+                      description: 'No special accommodations needed'
+                    };
+                }
+              };
+
+              const style = getRiskStyle(assessment.suitability);
+              const RiskIcon = style.icon;
+
+              return (
+                <div 
+                  key={userId}
+                  className={`${style.bg} border ${style.border} rounded-xl p-5`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg ${style.bg} border ${style.border}`}>
+                      <Shield className={`w-6 h-6 ${style.text}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-white">{participantName}</h3>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${style.bg} border ${style.border}`}>
+                          <RiskIcon className={`w-4 h-4 ${style.text}`} />
+                          <span className={`text-sm font-medium ${style.text}`}>{style.label}</span>
+                        </div>
+                      </div>
+                      <p className="text-white/70 text-sm mb-3">{style.description}</p>
+                      
+                      {/* Risk Indicators */}
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <div className="text-white/60 text-xs mb-1">IPV Indicators</div>
+                          <div className={`text-2xl font-bold ${assessment.ipvFlags >= 5 ? 'text-red-400' : assessment.ipvFlags >= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
+                            {assessment.ipvFlags}
+                          </div>
+                        </div>
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <div className="text-white/60 text-xs mb-1">Power Imbalance</div>
+                          <div className={`text-2xl font-bold ${assessment.powerImbalance >= 8 ? 'text-red-400' : assessment.powerImbalance >= 5 ? 'text-yellow-400' : 'text-green-400'}`}>
+                            {assessment.powerImbalance}/10
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Process Adaptations */}
+                      {assessment.processAdaptations && assessment.processAdaptations.length > 0 && (
+                        <details className="group">
+                          <summary className="cursor-pointer text-sm font-medium text-white/80 hover:text-white flex items-center gap-2 mb-2">
+                            <span>View Recommended Process Adaptations</span>
+                            <span className="text-xs text-white/50 group-open:hidden">(click to expand)</span>
+                          </summary>
+                          <ul className="space-y-1 ml-4 mt-2">
+                            {assessment.processAdaptations.map((adaptation, idx) => (
+                              <li key={idx} className="text-sm text-white/70 flex items-start gap-2">
+                                <span className={`${style.text} mt-1`}>•</span>
+                                <span>{adaptation}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+
+                      {/* Support Resources */}
+                      {assessment.supportResources && assessment.supportResources.length > 0 && (
+                        <details className="group mt-3">
+                          <summary className="cursor-pointer text-sm font-medium text-white/80 hover:text-white flex items-center gap-2 mb-2">
+                            <span>Support Resources</span>
+                            <span className="text-xs text-white/50 group-open:hidden">(click to expand)</span>
+                          </summary>
+                          <ul className="space-y-1 ml-4 mt-2">
+                            {assessment.supportResources.map((resource, idx) => (
+                              <li key={idx} className="text-sm text-white/70">
+                                {resource}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+
+                      {/* Assessment Date */}
+                      {assessment.assessedAt && (
+                        <div className="mt-3 text-xs text-white/50">
+                          Assessment completed: {new Date(assessment.assessedAt).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Upcoming Sessions */}
         {(user?.role === 'mediator' || user?.role === 'admin') && (
