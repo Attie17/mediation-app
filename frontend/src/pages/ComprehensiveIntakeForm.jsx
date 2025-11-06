@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/apiClient';
 import { ChevronRight, ChevronLeft, Check, User, Home, Heart, Users, DollarSign, FileText, Target, Shield } from 'lucide-react';
+import FinancialCalculator from '../components/FinancialCalculator';
 
 const STEPS = [
   { id: 1, title: 'Personal Info', icon: User, description: 'Your basic details' },
@@ -21,6 +22,7 @@ export default function ComprehensiveIntakeForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [financialCalculations, setFinancialCalculations] = useState(null);
 
   const [formData, setFormData] = useState({
     // Step 1: Personal Information
@@ -261,7 +263,8 @@ export default function ComprehensiveIntakeForm() {
           role: 'divorcee',
           submittedAt: new Date().toISOString(),
           intakeCompleted: true,
-          ...formData
+          ...formData,
+          financialCalculations: financialCalculations || null
         }
       };
 
@@ -1197,6 +1200,26 @@ export default function ComprehensiveIntakeForm() {
                   <option value="unsure">Unsure</option>
                 </select>
               </div>
+            </div>
+
+            {/* Financial Calculator */}
+            <div className="mt-8">
+              <h4 className="text-lg font-semibold text-white mb-3">Financial Planning Tool</h4>
+              <p className="text-sm text-slate-400 mb-4">
+                Use this calculator to estimate child support and spousal maintenance based on SA law. 
+                Values are automatically populated from your entries above.
+              </p>
+              <FinancialCalculator 
+                initialData={{
+                  myIncome: formData.monthlyIncome?.replace(/[^\d]/g, '') || '',
+                  partnerIncome: formData.spouseMonthlyIncome?.replace(/[^\d]/g, '') || '',
+                  numberOfChildren: parseInt(formData.numberOfChildren) || 0,
+                  childAges: formData.childrenAges || [],
+                }}
+                onCalculationComplete={(calculations) => {
+                  setFinancialCalculations(calculations);
+                }}
+              />
             </div>
           </div>
         );
