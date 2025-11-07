@@ -22,7 +22,7 @@ export default function devAuth(req, _res, next) {
   // Otherwise generate deterministic UUID from email
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const userId = (headerId && uuidRegex.test(headerId)) ? headerId : uuidv5(String(email || 'dev@example.com'), namespace);
-  console.log('[devAuth] Computed userId:', userId, 'from', (headerId && uuidRegex.test(headerId)) ? 'headerId' : 'email');
+  console.log('[devAuth] Using userId:', userId, 'from', (headerId && uuidRegex.test(headerId)) ? 'headerId' : 'email');
   const name = req.header('x-dev-name') || email?.split('@')[0] || 'Dev User';
   req.user = { id: userId, email: email || 'dev@example.com', role, name, dev: true };
   console.log('[devAuth] Set req.user:', req.user);

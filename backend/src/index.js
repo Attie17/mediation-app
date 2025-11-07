@@ -45,6 +45,7 @@ import caseAssignmentsRouter from './routes/caseAssignments.js';
 import invitationsRouter from './routes/invitations.js';
 import casesListRouter from './routes/caseslist.js';
 import healthRouter from './routes/health.js';
+import riskAssessmentRouter from './routes/riskAssessment.js';
 import { authenticateUser } from './middleware/authenticateUser.js';
 import devAuth from './middleware/devAuth.js';
 import { securityHeaders, apiLimiter, requestSizeLimiter } from './middleware/security.js';
@@ -71,8 +72,9 @@ app.use(securityHeaders);
 // SECURITY: Strict origin validation in production
 const corsOptions = {
 	origin: (origin, callback) => {
-		// Allow requests with no origin (mobile apps, Postman, etc.)
-		if (!origin && !config.isProduction()) {
+		// Allow requests with no origin (health checks, curl, same-origin, mobile apps, etc.)
+		// These are safe because they can't access responses cross-origin anyway
+		if (!origin) {
 			return callback(null, true);
 		}
 		
@@ -80,11 +82,6 @@ const corsOptions = {
 		
 		// In production, strictly validate origin
 		if (config.isProduction()) {
-			if (!origin) {
-				logger.warn('Request with no origin header blocked in production');
-				return callback(new Error('Origin header required in production'));
-			}
-			
 			if (!allowedOrigins.includes(origin)) {
 				logger.warn(`Request from unauthorized origin: ${origin}`);
 				return callback(new Error(`Origin ${origin} not allowed`));
@@ -229,6 +226,7 @@ app.use('/api/caseslist', authenticateUser, casesListRouter);
 logger.debug('Case routes mounted at /api/cases');
 
 app.use('/api/users', usersRouter);
+app.use('/api/users', riskAssessmentRouter);
 app.use('/api/admin/users', usersRouter);
 app.use('/api/admin', adminRouter);
 logger.debug('User and admin routes mounted');

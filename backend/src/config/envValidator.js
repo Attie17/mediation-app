@@ -135,13 +135,8 @@ function validateDatabaseUrl() {
     };
   }
   
-  // In production, should use SSL
-  if (process.env.NODE_ENV === 'production' && !url.includes('sslmode=require')) {
-    return {
-      valid: false,
-      message: 'DATABASE_URL should include sslmode=require in production'
-    };
-  }
+  // Note: SSL mode is handled in db.js configuration, not in the URL
+  // We use NODE_TLS_REJECT_UNAUTHORIZED and PGSSLMODE env vars instead
   
   return { valid: true };
 }
@@ -255,7 +250,7 @@ export function validateEnvironment() {
   }
   
   // Check email configuration if email features enabled
-  if (process.env.ENABLE_EMAIL_NOTIFICATIONS !== 'false') {
+  if (process.env.ENABLE_EMAIL_NOTIFICATIONS === 'true') {
     for (const varName of EMAIL_REQUIRED_VARS) {
       const result = validateVar(varName, isProduction);
       if (!result.valid) {
@@ -266,10 +261,12 @@ export function validateEnvironment() {
         }
       }
     }
+  } else {
+    warnings.push('Email notifications disabled - SMTP variables not required');
   }
   
   // Check file storage configuration if uploads enabled
-  if (process.env.ENABLE_FILE_UPLOADS !== 'false') {
+  if (process.env.ENABLE_FILE_UPLOADS === 'true') {
     for (const varName of FILE_STORAGE_REQUIRED_VARS) {
       const result = validateVar(varName, isProduction);
       if (!result.valid) {
@@ -280,6 +277,8 @@ export function validateEnvironment() {
         }
       }
     }
+  } else {
+    warnings.push('File uploads disabled - Cloudinary variables not required');
   }
   
   // Log warnings

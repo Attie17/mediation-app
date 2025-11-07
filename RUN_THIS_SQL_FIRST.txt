@@ -1,0 +1,53 @@
+=============================================================================
+⚠️  CRITICAL: RUN THIS SQL IN SUPABASE FIRST ⚠️
+=============================================================================
+
+BEFORE deploying code, you MUST apply this database migration!
+
+Go to: https://supabase.com/dashboard/project/kjmwaoainmyzbmvalizu/sql
+
+Copy and paste this SQL, then click RUN:
+
+-----------------------------------------------------------------------------
+
+-- Add risk_assessment column to app_users table
+ALTER TABLE app_users 
+ADD COLUMN IF NOT EXISTS risk_assessment JSONB;
+
+-- Add GIN index for faster JSONB queries
+CREATE INDEX IF NOT EXISTS idx_app_users_risk_assessment 
+ON app_users USING GIN (risk_assessment);
+
+-- Add column comment for documentation
+COMMENT ON COLUMN app_users.risk_assessment IS 
+'JSONB object containing IPV screening results and risk scores';
+
+-----------------------------------------------------------------------------
+
+After running, verify with this query:
+
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'app_users' 
+AND column_name = 'risk_assessment';
+
+Expected result: risk_assessment | jsonb
+
+=============================================================================
+
+ONCE THE ABOVE SQL IS SUCCESSFULLY RUN, THEN PROCEED WITH:
+
+Step 1: Deploy Backend
+-----------------------
+cd c:\mediation-app
+git checkout render-deployment
+git merge feature/ipv-financial-tools
+git push origin render-deployment
+
+Step 2: Deploy Frontend  
+-----------------------
+git checkout master
+git merge feature/ipv-financial-tools
+git push origin master
+
+=============================================================================

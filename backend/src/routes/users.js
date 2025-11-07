@@ -57,6 +57,24 @@ router.get('/me', async (req, res) => {
       console.log(`[users:me:get] ${timestamp} UNAUTHORIZED - no userId`);
       return sendError(res, 401, 'USR_UNAUTHORIZED', 'Unauthorized');
     }
+    
+    // In dev mode, if database fails, return mock user
+    if (req.user.dev && process.env.DEV_AUTH_ENABLED === 'true') {
+      console.log(`[users:me:get] ${timestamp} DEV MODE - returning mock user`);
+      const mockUser = {
+        user_id: userId,
+        id: userId,
+        email: req.user.email,
+        name: req.user.name || req.user.email.split('@')[0],
+        role: req.user.role || 'divorcee',
+        organization_id: 'b325cbce-0a4c-4658-ac15-f6b4e8bbe62e',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        dev: true
+      };
+      return res.json({ ok: true, user: mockUser });
+    }
+    
     console.log(`[users:me:get] ${timestamp} calling ensureProfile`, { userId, email: req.user.email });
     const profile = await ensureProfile(userId, req.user.email, req.user.role);
     console.log(`[users:me:get] ${timestamp} OK`, { userId: profile.user_id, role: profile.role });
@@ -70,6 +88,24 @@ router.get('/me', async (req, res) => {
       table: err.table,
       stack: err.stack,
     });
+    
+    // In dev mode, fallback to mock user even on error
+    if (req.user?.dev && process.env.DEV_AUTH_ENABLED === 'true') {
+      console.log(`[users:me:get] ${timestamp} DEV MODE FALLBACK - returning mock user after error`);
+      const mockUser = {
+        user_id: req.user.id,
+        id: req.user.id,
+        email: req.user.email,
+        name: req.user.name || req.user.email.split('@')[0],
+        role: req.user.role || 'divorcee',
+        organization_id: 'b325cbce-0a4c-4658-ac15-f6b4e8bbe62e',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        dev: true
+      };
+      return res.json({ ok: true, user: mockUser });
+    }
+    
     return sendError(res, 500, 'USR_GET_FAILED', `Failed to fetch profile: ${err.message}`);
   }
 });

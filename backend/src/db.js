@@ -14,17 +14,29 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const databaseUrl = process.env.DATABASE_URL;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create Supabase client with validation
+let supabase;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+  console.warn('⚠️  Supabase credentials missing - some features may not work');
+  supabase = null;
+}
 
-// Configure SSL for production Supabase/Railway connections
+// Configure SSL for production Supabase connections
+// Supabase pooler requires SSL but uses self-signed certificates
 const poolConfig = {
 	connectionString: databaseUrl
 };
 
-// Supabase uses connection pooling which requires SSL but doesn't provide valid certs
-// This is the standard configuration for Supabase pooler connections
-if (databaseUrl && (databaseUrl.includes('supabase') || databaseUrl.includes('pooler'))) {
-	poolConfig.ssl = { rejectUnauthorized: false };
+// Force SSL to accept self-signed certificates for Supabase pooler
+if (process.env.NODE_ENV === 'production' || databaseUrl?.includes('supabase') || databaseUrl?.includes('pooler')) {
+	poolConfig.ssl = {
+		rejectUnauthorized: false,
+		// Additional SSL options to bypass certificate validation
+		ca: false,
+		checkServerIdentity: () => undefined
+	};
 }
 
 const pool = new Pool(poolConfig);
