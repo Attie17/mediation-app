@@ -273,7 +273,7 @@ export default function ComprehensiveIntakeForm() {
         body: JSON.stringify(payload)
       });
       
-      navigate('/divorcee');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to save intake form');
       setLoading(false);

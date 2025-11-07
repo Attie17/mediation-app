@@ -15,7 +15,7 @@ const SignInPage = () => {
     setError('');
     try {
       await login(email, password);
-      navigate('/home');
+      navigate('/dashboard');
     } catch (err) {
       setError('Invalid credentials');
     }

@@ -116,7 +116,7 @@ export default function AssetsDeclarationForm() {
 
       setSuccess(true);
       setTimeout(() => {
-        navigate('/divorcee');
+        navigate('/dashboard');
       }, 2000);
       
     } catch (err) {
@@ -296,7 +296,7 @@ export default function AssetsDeclarationForm() {
           <div className="flex gap-4">
             <button
               type="button"
-              onClick={() => navigate('/divorcee')}
+              onClick={() => navigate('/dashboard')}
               className="flex-1 py-3 px-6 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all duration-200"
             >
               Save for Later

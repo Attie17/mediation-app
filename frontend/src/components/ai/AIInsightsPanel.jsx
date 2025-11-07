@@ -31,7 +31,12 @@ export default function AIInsightsPanel({
       return;
     }
 
-    if (!caseId || !userId) return;
+    if (!caseId || !userId) {
+      // If required data is missing, set loading to false and show fallback
+      setInsights(generateFallbackInsights());
+      setLoading(false);
+      return;
+    }
 
     async function loadInsights() {
       try {
