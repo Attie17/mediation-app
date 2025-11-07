@@ -231,8 +231,13 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
               const pending = latest && !accepted && !rejected;
               
               // Check if this is a form-based document
-              const isFormDoc = d.key === 'assets_list' || d.key === 'liabilities_list';
-              const formCompleted = isFormDoc && (d.key === 'assets_list' ? formsCompleted.assets : formsCompleted.liabilities);
+              const isFormDoc = d.key === 'assets_list' || d.key === 'liabilities_list' || d.key === 'intake_form';
+              const formCompleted = isFormDoc && (
+                d.key === 'assets_list' ? formsCompleted.assets : 
+                d.key === 'liabilities_list' ? formsCompleted.liabilities :
+                d.key === 'intake_form' ? !!latest : // Intake form is completed if uploaded
+                false
+              );
               
               return (
                 <div key={d.key} className="flex items-center justify-between py-2.5">
@@ -258,7 +263,16 @@ export default function DivorceeDocumentsPanel({ caseId, userId, role = 'divorce
                     )}
                     {role === 'divorcee' && (
                       <>
-                        {d.key === 'assets_list' ? (
+                        {d.key === 'intake_form' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 font-medium" 
+                            onClick={() => window.location.href = '/intake'}
+                          >
+                            {latest ? 'Review Form' : 'Complete the form'}
+                          </Button>
+                        ) : d.key === 'assets_list' ? (
                           <Button 
                             variant="outline" 
                             size="sm" 
