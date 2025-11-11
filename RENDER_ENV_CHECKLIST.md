@@ -19,6 +19,22 @@ SUPABASE_JWT_SECRET=[get from Supabase dashboard]
 
 ---
 
+## 🧠 Optional: Memory Tuning (only if you see OOM or chronic warnings)
+
+If you observe persistent high memory warnings or out-of-memory crashes in Render logs, consider setting:
+
+```bash
+# Raise V8 heap limit cautiously (value in MB)
+NODE_OPTIONS=--max-old-space-size=512
+```
+
+Notes:
+- Set this only if you have enough instance memory; on small/free plans, setting too high can cause earlier OOM.
+- Start with 512 and adjust based on logs. If warnings disappear and no OOM occurs, you’re good.
+- This is not a silver bullet—also monitor for memory leaks or large payloads.
+
+---
+
 ## 📋 Complete Environment Variables List
 
 Verify ALL these exist in Render:
@@ -97,6 +113,8 @@ For each variable:
 - Go to **"Events"** tab
 - Watch for "Deploy live" status
 - Check **"Logs"** tab for any errors
+
+If you enabled memory tuning, confirm in logs that the process starts without OOM and health checks remain stable.
 
 ---
 
