@@ -4,9 +4,9 @@ services:
     env: node
     region: oregon
     plan: free
-  # Include prebuild script; normalize line endings in case of CRLF to avoid bash\r issues on Render
-  buildCommand: sed -i 's/\r$//' backend/prebuild.sh && chmod +x backend/prebuild.sh && backend/prebuild.sh && cd backend && rm -rf node_modules && npm install --legacy-peer-deps --no-cache
-    startCommand: cd backend && npm start
+  # Resilient build: attempt prebuild if present; otherwise continue. Strip CRLF if file exists.
+  buildCommand: bash -c "if [ -f backend/prebuild.sh ]; then sed -i 's/\r$//' backend/prebuild.sh && chmod +x backend/prebuild.sh && echo '[render] running prebuild.sh' && backend/prebuild.sh; else echo '[render] prebuild.sh missing, continuing'; fi; cd backend && rm -rf node_modules && npm install --legacy-peer-deps --no-cache"
+  startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -41,8 +41,6 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         value: https://www.divorcesmediator.com,https://divorcesmediator.com,http://localhost:5173,http://localhost:3000
-      - key: PORT
-        value: 3000
       - key: NODE_TLS_REJECT_UNAUTHORIZED
         value: 0
       - key: PGSSLMODE
