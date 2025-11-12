@@ -4,9 +4,10 @@ services:
     env: node
     region: oregon
     plan: free
-    # Resilient build: attempt prebuild if present; otherwise continue. Strip CRLF if file exists.
-    buildCommand: bash -c "if [ -f backend/prebuild.sh ]; then sed -i 's/\r$//' backend/prebuild.sh && chmod +x backend/prebuild.sh && echo '[render] running prebuild.sh' && backend/prebuild.sh; else echo '[render] prebuild.sh missing, continuing'; fi" && cd backend && rm -rf node_modules && npm install --legacy-peer-deps --no-cache
-    startCommand: cd backend && npm start
+    rootDirectory: backend
+    # Simplified build now that rootDirectory is backend
+    buildCommand: bash -c "if [ -f prebuild.sh ]; then sed -i 's/\r$//' prebuild.sh && chmod +x prebuild.sh && echo '[render] running prebuild.sh' && ./prebuild.sh; else echo '[render] prebuild.sh missing, continuing'; fi" && rm -rf node_modules && npm install --legacy-peer-deps --no-cache
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
