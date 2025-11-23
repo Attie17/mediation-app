@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
+import { getStoredToken } from '../../config/api';
 
 const AIChat = ({ sessionId, currentUser }) => {
   const [messages, setMessages] = useState([]);
@@ -24,9 +25,10 @@ const AIChat = ({ sessionId, currentUser }) => {
     if (!sessionId) return;
     
     try {
+      const token = getStoredToken();
       const response = await fetch(`/api/settlement-sessions/${sessionId}/chat`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
       });
       
@@ -57,12 +59,13 @@ const AIChat = ({ sessionId, currentUser }) => {
     setIsLoading(true);
 
     try {
+      const token = getStoredToken();
       // Send to AI endpoint
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           message: inputMessage,
@@ -93,7 +96,7 @@ const AIChat = ({ sessionId, currentUser }) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             },
             body: JSON.stringify({
               messages: [userMessage, aiMessage]

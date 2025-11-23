@@ -31,7 +31,8 @@ export default function MediatorSessionsList() {
       
       if (response.ok) {
         const data = await response.json();
-        setSessions(data.sessions || []);
+        // Backend returns { sessions: { upcoming, past, all } }, use all array
+        setSessions(data.sessions?.all || []);
       }
     } catch (error) {
       console.error('Error fetching sessions:', error);
@@ -40,16 +41,26 @@ export default function MediatorSessionsList() {
     }
   };
 
+  const getSessionDateTime = (session) => {
+    if (!session?.session_date) return null;
+    const hasTimeInDate = typeof session.session_date === 'string' && session.session_date.includes('T');
+    const isoSource = hasTimeInDate
+      ? session.session_date
+      : `${session.session_date}${session.session_time ? `T${session.session_time}` : ''}`;
+    const dt = new Date(isoSource);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+
   const now = new Date();
   const filteredSessions = sessions.filter(s => {
-    const sessionDate = new Date(s.session_date);
+    const sessionDate = getSessionDateTime(s);
     const matchesSearch = s.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           s.case_id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     
     let matchesTime = true;
-    if (timeFilter === 'upcoming') matchesTime = sessionDate >= now;
-    if (timeFilter === 'past') matchesTime = sessionDate < now;
+    if (timeFilter === 'upcoming') matchesTime = sessionDate ? sessionDate >= now : false;
+    if (timeFilter === 'past') matchesTime = sessionDate ? sessionDate < now : false;
     
     return matchesSearch && matchesStatus && matchesTime;
   });
@@ -64,9 +75,10 @@ export default function MediatorSessionsList() {
     return colors[status] || colors.scheduled;
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { 
+  const formatDate = (session) => {
+    const dt = getSessionDateTime(session);
+    if (!dt) return 'N/A';
+    return dt.toLocaleDateString('en-US', { 
       weekday: 'short',
       month: 'short', 
       day: 'numeric', 
@@ -74,9 +86,10 @@ export default function MediatorSessionsList() {
     });
   };
 
-  const formatTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleTimeString('en-US', { 
+  const formatTime = (session) => {
+    const dt = getSessionDateTime(session);
+    if (!dt) return 'N/A';
+    return dt.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
       minute: '2-digit',
       hour12: true 
@@ -84,7 +97,9 @@ export default function MediatorSessionsList() {
   };
 
   const sortedSessions = [...filteredSessions].sort((a, b) => {
-    return new Date(a.session_date) - new Date(b.session_date);
+    const aDate = getSessionDateTime(a)?.getTime() || 0;
+    const bDate = getSessionDateTime(b)?.getTime() || 0;
+    return aDate - bDate;
   });
 
   return (
@@ -192,8 +207,8 @@ export default function MediatorSessionsList() {
         ) : (
           <div className="space-y-4">
             {sortedSessions.map((session) => {
-              const sessionDate = new Date(session.session_date);
-              const isPast = sessionDate < now;
+              const sessionDate = getSessionDateTime(session);
+              const isPast = sessionDate ? sessionDate < now : false;
               
               return (
                 <Card 
@@ -221,11 +236,11 @@ export default function MediatorSessionsList() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-400">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-blue-400" />
-                            <span>{formatDate(session.session_date)}</span>
+                            <span>{formatDate(session)}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-teal-400" />
-                            <span>{formatTime(session.session_date)} ({session.duration_minutes || 60} min)</span>
+                            <span>{formatTime(session)} ({session.duration_minutes || 60} min)</span>
                           </div>
                           {session.location && (
                             <div className="flex items-center gap-2">
@@ -272,7 +287,10 @@ export default function MediatorSessionsList() {
               </div>
               <div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {sessions.filter(s => new Date(s.session_date) >= now && s.status === 'scheduled').length}
+                  {sessions.filter(s => {
+                    const sessionDate = getSessionDateTime(s);
+                    return sessionDate && sessionDate >= now && s.status === 'scheduled';
+                  }).length}
                 </div>
                 <div className="text-sm text-slate-400">Upcoming</div>
               </div>

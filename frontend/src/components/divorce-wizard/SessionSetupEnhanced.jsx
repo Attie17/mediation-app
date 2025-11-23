@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Users, User, FileText, Briefcase } from 'lucide-react';
+import { getStoredToken } from '../../config/api';
 
 const SessionSetupEnhanced = ({ currentUser, onSessionStart }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -29,11 +30,9 @@ const SessionSetupEnhanced = ({ currentUser, onSessionStart }) => {
 
   const fetchCases = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const response = await fetch('/api/cases', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {
         const data = await response.json();
@@ -67,12 +66,12 @@ const SessionSetupEnhanced = ({ currentUser, onSessionStart }) => {
   const handleCreateSession = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const response = await fetch('/api/settlement-sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           mode: sessionData.mode,
@@ -102,12 +101,12 @@ const SessionSetupEnhanced = ({ currentUser, onSessionStart }) => {
   const handleJoinSession = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const response = await fetch(`/api/settlement-sessions/${joinData.sessionId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           party2_name: joinData.party2_name

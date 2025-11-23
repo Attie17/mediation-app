@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle } from 'lucide-react';
+import { getStoredToken } from '../../config/api';
 
 const SessionSetup = ({ onSessionCreated }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -20,11 +21,9 @@ const SessionSetup = ({ onSessionCreated }) => {
 
   const fetchCases = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const response = await fetch('/api/cases', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {
         const data = await response.json();
@@ -57,12 +56,12 @@ const SessionSetup = ({ onSessionCreated }) => {
   const handleCreateSession = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const response = await fetch('/api/settlement-sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(sessionData)
       });

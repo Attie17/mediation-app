@@ -4,7 +4,7 @@
 const config = {
   // API
   api: {
-    baseUrl: import.meta.env.VITE_API_BASE_URL || 'https://mediation-app-production.up.railway.app',
+    baseUrl: import.meta.env.VITE_API_BASE_URL || 'https://mediation-app.onrender.com',
     timeout: parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 30000,
   },
 

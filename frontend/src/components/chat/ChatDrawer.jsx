@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog';
 import ChatRoom from './ChatRoom';
 import ChatAISidebar from '../ai/ChatAISidebar';
@@ -25,7 +25,6 @@ export default function ChatDrawer({ open: controlledOpen, onOpenChange, caseId 
   };
   const [channels, setChannels] = useState([]);
   const [activeId, setActiveId] = useState(null);
-  const token = useMemo(() => localStorage.getItem('token') || '', []);
 
   useEffect(() => {
     if (!openValue || !user) return;

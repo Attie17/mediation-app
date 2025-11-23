@@ -8,6 +8,13 @@ import config from './index';
 export const API_BASE_URL = config.api.baseUrl;
 
 /**
+ * Retrieve the stored auth token (prefers auth_token, falls back to legacy key)
+ */
+export const getStoredToken = () => {
+  return localStorage.getItem('auth_token') || localStorage.getItem('token') || null;
+};
+
+/**
  * API Endpoints
  * Organized by feature/resource
  */
@@ -131,7 +138,7 @@ export const buildUrl = (endpoint) => {
  * @returns {Object} - Headers object with Authorization if token exists
  */
 export const getAuthHeaders = () => {
-  const token = localStorage.getItem('auth_token');
+  const token = getStoredToken();
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -167,5 +174,6 @@ export default {
   API_ENDPOINTS,
   buildUrl,
   getAuthHeaders,
+  getStoredToken,
   fetchWithAuth,
 };

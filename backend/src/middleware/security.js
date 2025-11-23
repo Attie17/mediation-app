@@ -83,6 +83,19 @@ export const emailLimiter = rateLimit({
   },
 });
 
+// Targeted Rate Limiting - AI endpoints (protect OpenAI usage)
+export const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  message: {
+    error: 'Too many AI requests detected. Please wait a minute before trying again.',
+    retryAfter: '60 seconds'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => config.isDevelopment(),
+});
+
 // Request Size Limiting Middleware
 export const requestSizeLimiter = (req, res, next) => {
   const contentLength = req.headers['content-length'];
@@ -104,5 +117,6 @@ export default {
   authLimiter,
   createLimiter,
   emailLimiter,
+  aiLimiter,
   requestSizeLimiter,
 };

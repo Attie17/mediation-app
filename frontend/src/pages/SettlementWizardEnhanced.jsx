@@ -5,6 +5,7 @@ import SessionSetupEnhanced from '../components/divorce-wizard/SessionSetupEnhan
 import AnnexureAFormEnhanced from '../components/divorce-wizard/AnnexureAFormEnhanced';
 import AIChat from '../components/divorce-wizard/AIChat';
 import { ArrowLeft, Users, User, Clock, CheckCircle } from 'lucide-react';
+import { getStoredToken } from '../config/api';
 
 const SettlementWizardContent = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -18,7 +19,7 @@ const SettlementWizardContent = () => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       if (!token) {
         navigate('/login');
         return;

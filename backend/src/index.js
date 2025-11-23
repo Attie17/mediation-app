@@ -48,9 +48,10 @@ import healthRouter from './routes/health.js';
 import riskAssessmentRouter from './routes/riskAssessment.js';
 import { authenticateUser } from './middleware/authenticateUser.js';
 import devAuth from './middleware/devAuth.js';
-import { securityHeaders, apiLimiter, requestSizeLimiter } from './middleware/security.js';
+import { securityHeaders, apiLimiter, requestSizeLimiter, aiLimiter } from './middleware/security.js';
 import { errorHandler, notFoundHandler, requestLogger } from './middleware/errorHandler.js';
 import { sanitizeInput } from './middleware/validation.js';
+import aiUsageLogger from './middleware/aiUsageLogger.js';
 
 const app = express();
 
@@ -239,7 +240,7 @@ logger.debug('Organization routes mounted');
 app.use('/api/case-assignments', authenticateUser, caseAssignmentsRouter);
 
 app.use('/api/chat', chatRouter);
-app.use('/api/ai', aiRouter);
+app.use('/api/ai', aiLimiter, aiUsageLogger, aiRouter);
 app.use('/api/settlement-sessions', settlementSessionsRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/messages', messagesRouter);

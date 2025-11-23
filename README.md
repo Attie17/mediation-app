@@ -1,5 +1,35 @@
 # Mediation App
 
+## 🚀 Production Architecture
+
+### Current Deployment (November 2025)
+
+```
+Frontend (Vercel)
+  URL: https://www.divorcesmediator.com
+  Framework: React + Vite
+    ↓
+Backend (Render)
+  URL: https://mediation-app.onrender.com
+  Runtime: Node.js v22 + Express
+  Region: Oregon (US-West)
+    ↓
+Database (Supabase)
+  PostgreSQL with pgvector
+  Connection pooling via Supavisor
+```
+
+**API Configuration:**
+- Frontend defaults to: `https://mediation-app.onrender.com`
+- Override via `VITE_API_BASE_URL` environment variable
+- CORS enabled for divorcesmediator.com domains
+
+**Quick Links:**
+- 🌐 Frontend: https://www.divorcesmediator.com
+- 🔧 Backend API: https://mediation-app.onrender.com/api/health
+- 📊 Render Dashboard: https://dashboard.render.com
+- 🎨 Vercel Dashboard: https://vercel.com/dashboard
+
 ## Post-Migration Sweep
 
 After applying the notifications migration, run the automated sweep to verify the system is healthy:
@@ -49,7 +79,7 @@ If you see the duplicate host version warning, ensure no other `createClient()` 
 ### API Base & Fetch Wrapper
 
 Frontend API calls now go through `src/lib/apiClient.js` which:
-- Reads optional `VITE_API_BASE` (e.g. `http://localhost:4000`) else uses relative paths.
+- Reads optional `VITE_API_BASE` / `VITE_API_BASE_URL` (e.g. `http://localhost:4000`). If unset it now defaults to the Render backend (`https://mediation-app.onrender.com`).
 - Adds JSON headers, timeout & abort handling.
 - Throws rich errors with `status` & `body` attached.
 

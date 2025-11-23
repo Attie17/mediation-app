@@ -138,6 +138,7 @@ Provider: OpenAI
 - ✅ Role-based access control
 - ✅ Input sanitization
 - ✅ Anti-hallucination rules for AI
+- ✅ AI-specific rate limiting + per-request logging (protects API costs and adds traceability)
 
 ---
 

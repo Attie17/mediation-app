@@ -1,3 +1,5 @@
+import { getStoredToken } from '../config/api';
+
 export const AppRoles = ['admin', 'mediator', 'divorcee', 'lawyer'];
 
 export function roleToPath(role) {
@@ -9,7 +11,7 @@ export function roleToPath(role) {
 
 export async function getSessionAndProfile() {
   try {
-    const token = localStorage.getItem('token');
+    const token = getStoredToken();
     const userStr = localStorage.getItem('user');
     let profile = null;
     if (userStr) {

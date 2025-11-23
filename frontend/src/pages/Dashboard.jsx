@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import config from '../config';
+import { getStoredToken } from '../config/api';
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -26,7 +27,7 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const headers = {
         'Content-Type': 'application/json'
       };

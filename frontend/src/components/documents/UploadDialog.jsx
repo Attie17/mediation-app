@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { useToast } from '../ui/toast';
 import config from '../../config';
 import { validateDocument, getHelpMessage } from '../../services/aiDocumentValidator';
+import { getStoredToken } from '../../config/api';
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -82,7 +83,7 @@ export default function UploadDialog({ open, onOpenChange, docKey, caseId, userI
     setUploadSpeed(0);
 
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('token') || '';
+      const token = getStoredToken() || '';
       
       // Use XMLHttpRequest for upload progress tracking
       await new Promise((resolve, reject) => {

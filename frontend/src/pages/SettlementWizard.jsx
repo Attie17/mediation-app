@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SessionSetup from '../components/divorce-wizard/SessionSetup';
 import AnnexureAForm from '../components/divorce-wizard/AnnexureAForm';
 import AIChat from '../components/divorce-wizard/AIChat';
+import { getStoredToken } from '../config/api';
 
 const SettlementWizard = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -17,7 +18,7 @@ const SettlementWizard = () => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       if (!token) {
         navigate('/login');
         return;
@@ -49,9 +50,10 @@ const SettlementWizard = () => {
       if (savedSession) {
         const sessionData = JSON.parse(savedSession);
         // Verify session still exists and is active
+        const token = getStoredToken();
         const response = await fetch(`/api/settlement-sessions/${sessionData.id}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           }
         });
         
@@ -86,11 +88,12 @@ const SettlementWizard = () => {
       const otherPartyName = newParty === 'party1' ? activeSession.party1_name : activeSession.party2_name || 'Party 2';
       
       if (confirm(`Switch to ${otherPartyName}? Current progress will be saved.`)) {
+        const token = getStoredToken();
         const response = await fetch(`/api/settlement-sessions/${activeSession.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ current_party: newParty })
         });
@@ -109,11 +112,12 @@ const SettlementWizard = () => {
 
   const handleFormSave = async (sectionName, formData) => {
     try {
+      const token = getStoredToken();
       const response = await fetch(`/api/settlement-sessions/${activeSession.id}/sections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           section_name: sectionName,
@@ -135,11 +139,12 @@ const SettlementWizard = () => {
 
   const handleApproval = async (sectionName, approved) => {
     try {
+      const token = getStoredToken();
       const response = await fetch(`/api/settlement-sessions/${activeSession.id}/approvals`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           section_name: sectionName,

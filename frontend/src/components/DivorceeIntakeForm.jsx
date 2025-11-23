@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getStoredToken } from '../config/api';
 
 const STEPS = [
   'Case Details',
@@ -194,11 +195,12 @@ function DivorceeIntakeForm() {
         status: 'open'
       };
 
+      const token = getStoredToken();
       const res = await fetch('/api/cases', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(payload)
       });

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { getStoredToken } from '../config/api';
 
 // Import supabase client from main app's structure
 // Note: This will need to be adapted to main app's supabase setup
@@ -41,6 +42,11 @@ const initialState: SessionState = {
   chatLogs: [],
   loading: false,
   error: null
+};
+
+const getAuthHeader = () => {
+  const token = getStoredToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // Session reducer
@@ -148,7 +154,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           mode: sessionData.mode,
@@ -189,7 +195,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ party2_name })
       });
@@ -217,7 +223,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ current_party: newParty })
       });
@@ -245,7 +251,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           section_name: sectionName,
@@ -273,7 +279,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           section_name: sectionName,
@@ -303,7 +309,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           section_name: sectionName,
@@ -333,7 +339,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           message: message,
@@ -361,7 +367,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Load session
       const sessionResponse = await fetch(`/api/settlement-sessions/${sessionId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         }
       });
 
@@ -411,7 +417,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           section_name: section.name,
@@ -425,7 +431,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/settlement-sessions/${sessionId}/sections`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         }
       });
       
@@ -442,7 +448,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/settlement-sessions/${sessionId}/approvals`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         }
       });
       
@@ -459,7 +465,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/settlement-sessions/${sessionId}/conflicts`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         }
       });
       
@@ -476,7 +482,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/settlement-sessions/${sessionId}/chat`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...getAuthHeader()
         }
       });
       

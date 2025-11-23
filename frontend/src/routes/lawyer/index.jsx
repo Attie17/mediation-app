@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import ChatDrawer from '../../components/chat/ChatDrawer';
 import config from '../../config';
+import { getStoredToken } from '../../config/api';
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -46,7 +47,7 @@ export default function LawyerDashboard() {
       
       try {
         setLoading(true);
-        const token = localStorage.getItem('token');
+        const token = getStoredToken();
         const headers = {
           'Content-Type': 'application/json'
         };

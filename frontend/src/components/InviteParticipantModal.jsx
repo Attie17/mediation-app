@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, UserPlus, Mail, User } from 'lucide-react';
 import config from '../config';
+import { getStoredToken } from '../config/api';
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -25,7 +26,7 @@ export default function InviteParticipantModal({ isOpen, onClose, caseId, onSucc
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const headers = {
         'Content-Type': 'application/json'
       };
