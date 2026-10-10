@@ -16,7 +16,7 @@ function sendError(res, status, code, message) {
 }
 
 // Ensure a profile row exists for current user
-async function ensureProfile(userId, email, role = 'divorcee') {
+async function ensureProfile(userId, email) {
   try {
     const sel = await pool.query(
       `SELECT user_id, email, name, preferred_name, phone, address, avatar_url, role, organization_id, profile_details, created_at, updated_at
@@ -25,8 +25,8 @@ async function ensureProfile(userId, email, role = 'divorcee') {
     );
     if (sel.rows[0]) return sel.rows[0];
     
-    // Default to divorcee if no role provided
-    const userRole = VALID_ROLES.has(role) ? role : 'divorcee';
+    // Self-service creation always starts with ordinary authority.
+    const userRole = 'divorcee';
     
     const ins = await pool.query(
       `INSERT INTO app_users(user_id, email, role, profile_details) VALUES($1,$2,$3,$4)
@@ -76,7 +76,7 @@ router.get('/me', async (req, res) => {
     }
     
     console.log(`[users:me:get] ${timestamp} calling ensureProfile`, { userId, email: req.user.email });
-    const profile = await ensureProfile(userId, req.user.email, req.user.role);
+    const profile = await ensureProfile(userId, req.user.email);
     console.log(`[users:me:get] ${timestamp} OK`, { userId: profile.user_id, role: profile.role });
     return res.json({ ok: true, user: profile });
   } catch (err) {
@@ -193,8 +193,20 @@ router.post('/profile', async (req, res) => {
       return sendError(res, 400, 'USR_INVALID_ROLE', 'Invalid role');
     }
 
+    // Self-service profiles cannot assign or change authority. Existing clients
+    // may echo their current role, but role changes use the administration flow.
+    if (role !== undefined) {
+      const { rows: current } = await pool.query(
+        'SELECT role FROM app_users WHERE user_id=$1 LIMIT 1', [userId]
+      );
+      const currentRole = current[0]?.role ?? 'divorcee';
+      if (role !== currentRole) {
+        return sendError(res, 403, 'USR_ROLE_CHANGE_FORBIDDEN', 'Role changes require the authorised administration workflow');
+      }
+    }
+
     // Ensure profile row exists for this user (idempotent)
-  await ensureProfile(userId, req.user?.email, role || req.user?.role);
+    await ensureProfile(userId, req.user?.email);
 
     // Build address JSON from different possible formats
     let address = addressData;
@@ -223,7 +235,6 @@ router.post('/profile', async (req, res) => {
     if (phone !== undefined) push('phone', phone);
     if (address !== undefined) push('address', address);
     if (avatarUrl !== undefined) push('avatar_url', avatarUrl);
-    if (role !== undefined) push('role', role);
     if (profileDetails !== undefined) {
       if (profileDetails && typeof profileDetails === 'object') {
         push('profile_details', profileDetails);

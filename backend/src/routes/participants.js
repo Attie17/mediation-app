@@ -1,19 +1,10 @@
 import express from 'express';
-import crypto from 'crypto';
-import { Pool } from 'pg';
+import { pool } from '../db.js';
+import { withTransaction } from '../utils/tx.js';
+import { resolveAuthorizedCase } from '../security/pilotAccess.js';
+import { requireMediatorCase, findVerifiedTarget } from '../security/membership.js';
 import { supabase, requireSupabaseOr500 } from '../lib/supabaseClient.js';
 import { authenticateUser } from '../middleware/authenticateUser.js';
-
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is required for participants routes');
-}
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes('supabase')
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
 
 const router = express.Router();
 router.use((req,res,next)=>{ if(!supabase) return requireSupabaseOr500(res); next(); });
@@ -35,17 +26,12 @@ function validateUUID(req, res, next) {
   next();
 }
 
-const isActiveStatus = (status) => {
-  if (status === null || status === undefined) return true;
-  return status === 'active';
-};
-
 const mapParticipantRow = (row) => ({
   id: row.id,
   case_id: row.case_id,
   user_id: row.user_id,
   role: row.role,
-  status: row.status ?? 'active',
+  status: row.status ?? null,
   created_at: row.created_at,
   updated_at: row.updated_at ?? row.created_at,
   email: row.email ?? null,
@@ -92,278 +78,30 @@ async function withClient(callback, res) {
   }
 }
 
-async function fetchCaseRecord(client, caseId) {
-  try {
-    const result = await client.query(
-      `SELECT id, mediator_id FROM cases WHERE id = $1 LIMIT 1`,
-      [caseId]
-    );
-    return result.rows[0] || null;
-  } catch (error) {
-    if (error.code === '42703') {
-      const fallback = await client.query(
-        `SELECT id FROM cases WHERE id = $1 LIMIT 1`,
-        [caseId]
-      );
-      return fallback.rows[0] ? { ...fallback.rows[0], mediator_id: null } : null;
-    }
-    throw error;
-  }
-}
-
-async function fetchMembership(client, caseId, userId) {
-  try {
-    const result = await client.query(
-      `SELECT id, role, status FROM case_participants WHERE case_id = $1 AND user_id = $2 LIMIT 1`,
-      [caseId, userId]
-    );
-    return result.rows[0] || null;
-  } catch (error) {
-    if (error.code === '42703') {
-      const fallback = await client.query(
-        `SELECT id, role FROM case_participants WHERE case_id = $1 AND user_id = $2 LIMIT 1`,
-        [caseId, userId]
-      );
-      return fallback.rows[0] ? { ...fallback.rows[0], status: 'active' } : null;
-    }
-    throw error;
-  }
-}
-
-async function requireCaseExists(client, caseId) {
-  const caseRecord = await fetchCaseRecord(client, caseId);
-  if (!caseRecord) {
-    const error = new Error('Case not found');
-    error.status = 404;
-    throw error;
-  }
-  return caseRecord;
-}
-
-async function requireMediatorAccess(client, caseId, user) {
-  const caseRecord = await requireCaseExists(client, caseId);
-  if (caseRecord.mediator_id && caseRecord.mediator_id === user.id) {
-    return caseRecord;
-  }
-
-  const membership = await fetchMembership(client, caseId, user.id);
-  if (membership && membership.role === 'mediator' && isActiveStatus(membership.status)) {
-    return caseRecord;
-  }
-
-  const error = new Error('Mediator access required for this action');
-  error.status = 403;
-  throw error;
-}
-
 async function requireViewerAccess(client, caseId, user) {
-  const caseRecord = await requireCaseExists(client, caseId);
-
-  if (caseRecord.mediator_id && caseRecord.mediator_id === user.id) {
-    return caseRecord;
-  }
-
-  const membership = await fetchMembership(client, caseId, user.id);
-  if (membership && isActiveStatus(membership.status)) {
-    return caseRecord;
-  }
-
-  const error = new Error('You do not have access to this case');
-  error.status = 403;
-  throw error;
-}
-
-async function ensureAppUser(client, userId, role, email, name) {
-  try {
-    await client.query(
-      `INSERT INTO app_users (id, role, email, name)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role,
-                                      email = COALESCE(EXCLUDED.email, app_users.email),
-                                      name = COALESCE(EXCLUDED.name, app_users.name)`,
-      [userId, role, email, name]
-    );
-  } catch (error) {
-    if (error.code === '42703') {
-      await client.query(
-        `INSERT INTO app_users (id, role)
-         VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role`,
-        [userId, role]
-      );
-    } else {
-      throw error;
-    }
+  if (!await resolveAuthorizedCase(client, caseId, user?.id)) {
+    const error = new Error('You do not have access to this case');
+    error.status = 403;
+    throw error;
   }
 }
 
-async function loadOrCreateUser(client, email, name, defaultRole = 'divorcee') {
-  const normalizedEmail = email.trim().toLowerCase();
-  const desiredName = name || normalizedEmail.split('@')[0];
-  const assignedRole = defaultRole || 'divorcee';
-
-  let existing;
-  try {
-    existing = await client.query(
-      `SELECT id, email, raw_user_meta_data->>'name' AS name
-       FROM auth.users
-       WHERE LOWER(email) = $1
-       LIMIT 1`,
-      [normalizedEmail]
-    );
-  } catch (error) {
-    if (error.code === '42703') {
-      existing = await client.query(
-        `SELECT id, email FROM auth.users
-         WHERE LOWER(email) = $1
-         LIMIT 1`,
-        [normalizedEmail]
-      );
-    } else {
-      throw error;
-    }
+async function runWrite(res, callback) {
+  try { return await withTransaction(pool, callback); }
+  catch (error) {
+    return res.status(error.status || (['42703', '42P01'].includes(error.code) ? 503 : 500))
+      .json({ error: error.status ? error.message : 'Membership operation unavailable' });
   }
-
-  if (existing.rows[0]) {
-    return {
-      id: existing.rows[0].id,
-      email: existing.rows[0].email,
-      name: existing.rows[0].name || desiredName,
-    };
-  }
-
-  const newUserId = crypto.randomUUID();
-  try {
-    await client.query(
-      `INSERT INTO auth.users (
-         id, email, raw_app_meta_data, raw_user_meta_data,
-         aud, role, encrypted_password, email_confirmed_at, created_at, updated_at,
-         is_super_admin, is_sso_user, is_anonymous
-       )
-       VALUES (
-         $1, $2, $3::jsonb, $4::jsonb,
-         'authenticated', 'authenticated', '', NOW(), NOW(), NOW(),
-         false, false, false
-       )`,
-      [newUserId, normalizedEmail, JSON.stringify({ role: assignedRole }), JSON.stringify({ name: desiredName })]
-    );
-  } catch (error) {
-    if (error.code === '42703') {
-      await client.query(
-        `INSERT INTO auth.users (
-           id, email, aud, role, raw_app_meta_data, raw_user_meta_data,
-           is_super_admin, is_sso_user, is_anonymous, created_at, updated_at
-         )
-         VALUES (
-           $1, $2, 'authenticated', 'authenticated', $3::jsonb, $4::jsonb,
-           false, false, false, NOW(), NOW()
-         )`,
-        [newUserId, normalizedEmail, JSON.stringify({ role: assignedRole }), JSON.stringify({ name: desiredName })]
-      );
-    } else {
-      throw error;
-    }
-  }
-
-  return {
-    id: newUserId,
-    email: normalizedEmail,
-    name: desiredName,
-  };
 }
 
 async function listParticipants(client, caseId) {
-  try {
-    const result = await client.query(
-      `SELECT cp.id,
-              cp.case_id,
-              cp.user_id,
-              cp.role,
-              cp.status,
-              cp.created_at,
-              cp.updated_at,
-              au.email,
-              au.name
-       FROM case_participants cp
-       LEFT JOIN app_users au ON au.id = cp.user_id
-       WHERE cp.case_id = $1
-       ORDER BY cp.created_at ASC`,
-      [caseId]
-    );
-    return result.rows.map(mapParticipantRow);
-  } catch (error) {
-    if (error.code === '42703') {
-      const fallback = await client.query(
-        `SELECT cp.id,
-                cp.case_id,
-                cp.user_id,
-                cp.role,
-                cp.created_at,
-                cp.updated_at,
-                au.email,
-                au.name
-         FROM case_participants cp
-         LEFT JOIN app_users au ON au.id = cp.user_id
-         WHERE cp.case_id = $1
-         ORDER BY cp.created_at ASC`,
-        [caseId]
-      );
-      return fallback.rows.map((row) => mapParticipantRow({ ...row, status: row.status ?? 'active' }));
-    }
-    throw error;
-  }
-}
-
-async function loadParticipant(client, caseId, participantId) {
-  if (!participantId) return null;
-
-  const identifier = participantId.toString();
-  try {
-    const result = await client.query(
-      `SELECT cp.id,
-              cp.case_id,
-              cp.user_id,
-              cp.role,
-              cp.status,
-              cp.created_at,
-              cp.updated_at,
-              au.email,
-              au.name
-       FROM case_participants cp
-       LEFT JOIN app_users au ON au.id = cp.user_id
-       WHERE cp.case_id = $1
-         AND (cp.id::text = $2 OR cp.user_id::text = $2)
-       LIMIT 1`,
-      [caseId, identifier]
-    );
-    if (result.rows[0]) {
-      return mapParticipantRow(result.rows[0]);
-    }
-  } catch (error) {
-    if (error.code !== '42703') {
-      throw error;
-    }
-  }
-
-  const fallback = await client.query(
-    `SELECT cp.id,
-            cp.case_id,
-            cp.user_id,
-            cp.role,
-            cp.status,
-            cp.created_at,
-            cp.updated_at,
-            au.email,
-            au.name
-     FROM case_participants cp
-     LEFT JOIN app_users au ON au.id = cp.user_id
-     WHERE cp.case_id = $1
-       AND cp.id::text = $2
-     LIMIT 1`,
-    [caseId, identifier]
-  );
-
-  return fallback.rows[0] ? mapParticipantRow(fallback.rows[0]) : null;
+  const result = await client.query(`SELECT cp.id,cp.case_id,cp.user_id,cp.role,
+    to_jsonb(cp)->>'status' AS status,cp.created_at,cp.updated_at,u.email,u.name
+    FROM case_participants cp JOIN cases c ON c.id=cp.case_id
+    JOIN app_users u ON COALESCE(to_jsonb(u)->>'user_id',to_jsonb(u)->>'id')=cp.user_id::text
+    WHERE cp.case_id=$1 AND to_jsonb(u)->>'organization_id'=to_jsonb(c)->>'organization_id'
+    ORDER BY cp.created_at ASC`, [caseId]);
+  return result.rows.map(mapParticipantRow);
 }
 
 router.get('/:caseId/participants', async (req, res) => {
@@ -393,165 +131,55 @@ router.get('/:caseId/participants', async (req, res) => {
 
 router.post('/:caseId/participants', async (req, res) => {
   const caseId = parseCaseId(req.params.caseId);
-  if (!caseId) {
-    return res.status(400).json({ error: 'Invalid case ID' });
-  }
-
-  const { email, name, role = 'divorcee' } = req.body || {};
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'email is required' });
-  }
-
-  if (!['divorcee', 'mediator'].includes(role)) {
-    return res.status(400).json({ error: 'role must be "divorcee" or "mediator"' });
-  }
-
-  return withClient(async (client) => {
-    try {
-      await requireMediatorAccess(client, caseId, req.user);
-    } catch (error) {
-      const status = error.status || 500;
-      return res.status(status).json({ error: error.message });
-    }
-
-    try {
-  const user = await loadOrCreateUser(client, email, name, role);
-      await ensureAppUser(client, user.id, role, user.email, user.name);
-
-      let participantRow;
-      try {
-        const insert = await client.query(
-          `INSERT INTO case_participants (case_id, user_id, role, status)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (case_id, user_id) DO UPDATE SET role = EXCLUDED.role
-           RETURNING id, case_id, user_id, role, status, created_at, updated_at`,
-          [caseId, user.id, role, 'invited']
-        );
-        participantRow = insert.rows[0];
-      } catch (error) {
-        if (error.code === '42703') {
-          const insert = await client.query(
-            `INSERT INTO case_participants (case_id, user_id, role)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (case_id, user_id) DO NOTHING
-             RETURNING id, case_id, user_id, role, created_at, updated_at`,
-            [caseId, user.id, role]
-          );
-          if (insert.rows.length === 0) {
-            return res.status(409).json({ error: 'User is already a participant in this case.' });
-          }
-          participantRow = { ...insert.rows[0], status: 'invited' };
-        } else if (error.code === '23505') {
-          return res.status(409).json({ error: 'User is already a participant in this case.' });
-        } else {
-          throw error;
-        }
-      }
-
-      const participant = mapParticipantRow({ ...participantRow, email: user.email, name: user.name });
-
-      await broadcastCaseUpdate(caseId, 'participant_added', {
-        participant_id: participant.id,
-        user_id: participant.user_id,
-        role: participant.role,
-      });
-
-      return res.json({ success: true, participant });
-    } catch (error) {
-      console.error('[participants] Failed to invite participant:', error);
-      return res.status(500).json({ error: 'Failed to invite participant' });
-    }
-  }, res);
+  const { email, role = 'divorcee' } = req.body || {};
+  if (!caseId || typeof email !== 'string' || !['divorcee', 'mediator'].includes(role))
+    return res.status(400).json({ error: 'Valid case, email and membership role required' });
+  const result = await runWrite(res, async client => {
+    const scope = await requireMediatorCase(client, caseId, req.user?.id);
+    const target = await findVerifiedTarget(client, scope, { email, role });
+    if (!target) { const error = new Error('Verified user in this practice required'); error.status = 404; throw error; }
+    const insert = await client.query(
+      `INSERT INTO case_participants (case_id,user_id,role,status) VALUES($1,$2,$3,'invited')
+       ON CONFLICT(case_id,user_id) DO NOTHING RETURNING *`, [scope.id, target.user_id, role]);
+    if (!insert.rows.length) { const error = new Error('Participant already exists; review their membership explicitly'); error.status = 409; throw error; }
+    return mapParticipantRow({ ...insert.rows[0], email: target.email, name: target.name });
+  });
+  if (res.headersSent) return;
+  await broadcastCaseUpdate(caseId, 'participant_added', { participant_id: result.id, user_id: result.user_id, role: result.role });
+  return res.json({ success: true, participant: result });
 });
 
 router.patch('/:caseId/participants/:participantId/activate', async (req, res) => {
   const caseId = parseCaseId(req.params.caseId);
-  if (!caseId) {
-    return res.status(400).json({ error: 'Invalid case ID' });
-  }
-  const { participantId } = req.params;
-
-  return withClient(async (client) => {
-    try {
-      await requireMediatorAccess(client, caseId, req.user);
-    } catch (error) {
-      const status = error.status || 500;
-      return res.status(status).json({ error: error.message });
-    }
-
-    let participant;
-    try {
-      const update = await client.query(
-        `UPDATE case_participants
-         SET status = 'active', updated_at = NOW()
-         WHERE case_id = $1 AND id = $2
-         RETURNING id, case_id, user_id, role, status, created_at, updated_at`,
-        [caseId, participantId]
-      );
-      participant = update.rows[0];
-    } catch (error) {
-      if (error.code === '42703') {
-        const update = await client.query(
-          `UPDATE case_participants
-           SET updated_at = NOW()
-           WHERE case_id = $1 AND id = $2
-           RETURNING id, case_id, user_id, role, created_at, updated_at`,
-          [caseId, participantId]
-        );
-        participant = update.rows[0]
-          ? { ...update.rows[0], status: 'active' }
-          : null;
-      } else {
-        throw error;
-      }
-    }
-
-    if (!participant) {
-      return res.status(404).json({ error: 'Participant not found for this case' });
-    }
-
-    const enriched = await loadParticipant(client, caseId, participantId);
-
-    await broadcastCaseUpdate(caseId, 'participant_activated', {
-      participant_id: participant.id,
-      user_id: participant.user_id,
-    });
-
-    return res.json({ success: true, participant: enriched || mapParticipantRow(participant) });
-  }, res);
+  if (!caseId || !isUuid(req.params.participantId)) return res.status(400).json({ error: 'Invalid identifier' });
+  const result = await runWrite(res, async client => {
+    const scope = await requireMediatorCase(client, caseId, req.user?.id);
+    const target = await client.query('SELECT * FROM case_participants WHERE case_id=$1 AND id=$2 FOR UPDATE', [scope.id, req.params.participantId]);
+    if (!target.rows[0]) { const error = new Error('Participant not found'); error.status = 404; throw error; }
+    const verified = await findVerifiedTarget(client, scope, { userId: target.rows[0].user_id, role: target.rows[0].role });
+    if (!verified) { const error = new Error('Verified user in this practice required'); error.status = 403; throw error; }
+    const update = await client.query("UPDATE case_participants SET status='active',updated_at=NOW() WHERE case_id=$1 AND id=$2 RETURNING *", [scope.id, req.params.participantId]);
+    return mapParticipantRow({ ...update.rows[0], email: verified.email, name: verified.name });
+  });
+  if (res.headersSent) return;
+  await broadcastCaseUpdate(caseId, 'participant_activated', { participant_id: result.id, user_id: result.user_id });
+  return res.json({ success: true, participant: result });
 });
 
-
-
-
-// Soft delete participant (status = 'removed')
 router.post('/participants/remove', validateUUID, async (req, res) => {
-  const { participant_id, case_id, role } = req.body;
-  return withClient(async (client) => {
-    // If removing a mediator, check for other active mediators
-    if (role === "mediator") {
-      const { rows } = await client.query(
-        "SELECT COUNT(*) FROM case_participants WHERE case_id = $1::uuid AND role = 'mediator' AND status = 'active'",
-        [case_id]
-      );
-      if (parseInt(rows[0].count) <= 1) {
-        return res.status(400).json({ error: "Cannot remove the last active mediator from this case." });
-      }
-    }
-    await client.query(
-      "UPDATE case_participants SET status = 'removed', updated_at = NOW() WHERE id = $1::uuid",
-      [participant_id]
-    );
-    res.json({ success: true });
-  }, res);
+  const { participant_id, case_id } = req.body || {};
+  if (!isUuid(participant_id) || !isUuid(case_id)) return res.status(400).json({ error: 'Valid case and participant required' });
+  await runWrite(res, async client => {
+    const scope = await requireMediatorCase(client, case_id, req.user?.id);
+    const target = await client.query('SELECT user_id,role FROM case_participants WHERE case_id=$1 AND id=$2 FOR UPDATE', [scope.id, participant_id]);
+    if (!target.rows[0]) { const error = new Error('Participant not found'); error.status = 404; throw error; }
+    if (String(target.rows[0].user_id) === String(req.user.id)) { const error = new Error('Use the case assignment workflow to remove the assigned mediator'); error.status = 409; throw error; }
+    await client.query("UPDATE case_participants SET status='removed',updated_at=NOW() WHERE case_id=$1 AND id=$2", [scope.id, participant_id]);
+  });
+  if (!res.headersSent) res.json({ success: true });
 });
 
-// Admin-only hard delete
-router.delete('/admin/participants/:id', validateUUID, async (req, res) => {
-  return withClient(async (client) => {
-    await client.query("DELETE FROM case_participants WHERE id = $1::uuid", [req.params.id]);
-    res.json({ success: true });
-  }, res);
-});
+// Preserve membership evidence; use the scoped soft-removal endpoint.
+router.delete('/admin/participants/:id', (_req, res) => res.status(405).json({ error: 'Use scoped membership removal' }));
 
-export default router;// trigger restart
+export default router;

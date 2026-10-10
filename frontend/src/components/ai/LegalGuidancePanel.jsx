@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Scale, BookOpen, AlertTriangle, CheckCircle, Info, ExternalLink } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const LegalGuidancePanel = ({ sessionId, caseData }) => {
   const [legalQuery, setLegalQuery] = useState('');

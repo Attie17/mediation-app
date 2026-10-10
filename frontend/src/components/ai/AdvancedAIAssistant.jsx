@@ -30,7 +30,7 @@ import {
   ThumbsDown,
   Star
 } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 // Component imports for different AI features
 import LegalGuidancePanel from './LegalGuidancePanel';

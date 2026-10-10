@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, CheckCircle, Lightbulb, Users, Target, ArrowRight } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const ConflictResolution = ({ sessionId, caseData }) => {
   const [conflictAnalysis, setConflictAnalysis] = useState(null);

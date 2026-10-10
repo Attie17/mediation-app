@@ -15,8 +15,8 @@ const CaseParticipants = ({ caseId, userRole = 'mediator' }) => {
       setLoading(true);
       setError(null);
       
-      const data = await apiFetch(`/api/participants/${caseId}/participants`);
-      setParticipants(data.participants || []);
+      const data = await apiFetch(`/api/cases/${caseId}/participants`);
+      setParticipants(Array.isArray(data) ? data : data.participants || []);
     } catch (err) {
       console.error('Error fetching participants:', err);
       setError(err.message);
@@ -37,7 +37,7 @@ const CaseParticipants = ({ caseId, userRole = 'mediator' }) => {
     try {
       setAddingParticipant(true);
       
-      const data = await apiFetch(`/api/participants/${caseId}/participants`, {
+      const data = await apiFetch(`/api/cases/${caseId}/participants`, {
         method: 'POST',
         body: JSON.stringify(newParticipant),
       });
@@ -64,7 +64,7 @@ const CaseParticipants = ({ caseId, userRole = 'mediator' }) => {
     }
 
     try {
-      await apiFetch(`/api/participants/${caseId}/participants/${userId}`, {
+      await apiFetch(`/api/cases/${caseId}/participants/${userId}`, {
         method: 'DELETE',
       });
       

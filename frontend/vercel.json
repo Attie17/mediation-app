@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/pilot-checks-2026-10-10": false
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

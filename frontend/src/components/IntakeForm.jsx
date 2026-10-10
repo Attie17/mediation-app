@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import config from '../config';
-
-const API_BASE_URL = config.api.baseUrl;
+import { apiFetch } from '../lib/apiClient';
 
 const IntakeForm = () => {
   const [step, setStep] = useState('');
@@ -16,23 +14,15 @@ const IntakeForm = () => {
     setLoading(true);
     setSuccess('');
     setError('');
-    const userId = localStorage.getItem('userId');
-    if (!userId) {
-      setError('No user ID found. Please log in.');
-      setLoading(false);
-      return;
-    }
     try {
-  const res = await fetch(`${API_BASE_URL}/intake`, {
+      const result = await apiFetch('/intake', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           step,
           answers: { outcome, readiness: Number(readiness) }
         })
       });
-      if (!res.ok) throw new Error('Failed to save intake');
+      if (!result.success) throw new Error('Failed to save intake');
       setSuccess('Intake saved successfully!');
       setStep('');
       setOutcome('');

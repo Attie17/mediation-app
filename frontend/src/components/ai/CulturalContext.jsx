@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Globe, Users, Heart, BookOpen, AlertCircle, Info, Star } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const CulturalContext = ({ context: initialContext, caseData }) => {
   const [culturalContext, setCulturalContext] = useState(initialContext);

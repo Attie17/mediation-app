@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, AlertCircle, CheckCircle, Clock, Target } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const PredictiveAnalytics = ({ predictions: initialPredictions, sessionId }) => {
   const [predictions, setPredictions] = useState(initialPredictions);

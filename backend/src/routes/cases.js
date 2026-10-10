@@ -1,6 +1,18 @@
 import express from 'express';
 import caseParticipantsRouter from './caseParticipants.js';
 import { supabase, requireSupabaseOr500 } from '../lib/supabaseClient.js';
+import { pool } from '../db.js';
+import { authenticateUser } from '../middleware/authenticateUser.js';
+import { withTransaction } from '../utils/tx.js';
+
+async function verifiedPracticeAdmin(db, req, caseId) {
+  const { rows } = await db.query(`SELECT c.id FROM cases c JOIN app_users u
+    ON COALESCE(to_jsonb(u)->>'user_id',to_jsonb(u)->>'id')=$2
+    WHERE c.id::text=$1 AND to_jsonb(u)->>'role'='admin'
+      AND to_jsonb(u)->>'organization_id'=to_jsonb(c)->>'organization_id'
+    FOR UPDATE OF c,u`, [caseId,req.user?.id]);
+  return rows.length === 1;
+}
 
 const router = express.Router();
 // Ensure supabase client exists for all downstream handlers
@@ -49,31 +61,19 @@ router.patch('/:id/close', async (req, res) => {
 });
 
 // Admin-only: Reopen case
-router.patch('/:id/reopen', async (req, res) => {
-  // Require admin role
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+router.patch('/:id/reopen', authenticateUser, async (req, res) => {
   const caseId = req.params.id;
   if (!/^[0-9a-fA-F-]{36}$/.test(caseId)) return res.status(400).json({ error: 'Invalid case ID' });
-
-  // Update case status and clear closed_at
-  const { error: caseErr } = await supabase
-    .from('cases')
-    .update({ status: 'active', closed_at: null })
-    .eq('id', caseId);
-  if (caseErr) {
-    return res.status(500).json({ error: 'Failed to reopen case.' });
+  try {
+    await withTransaction(pool, async client => {
+      if (!await verifiedPracticeAdmin(client, req, caseId))
+        throw Object.assign(new Error('Admin access required'), { status:403 });
+      await client.query("UPDATE cases SET status='active',closed_at=NULL WHERE id=$1", [caseId]);
+    });
+  } catch (error) {
+    return res.status(error.status || 503).json({ error: 'Case reopening unavailable' });
   }
-  // Restore participants previously marked removed
-  const { error: partErr } = await supabase
-    .from('case_participants')
-    .update({ status: 'active', updated_at: new Date().toISOString() })
-    .eq('case_id', caseId)
-    .eq('status', 'removed');
-  if (partErr) {
-    return res.status(500).json({ error: 'Failed to restore participants.' });
-  }
+  // Reopening does not restore revoked membership. Re-activation is explicit.
   res.json({ success: true, caseId, reopenedAt: new Date().toISOString() });
 });
 
@@ -382,7 +382,7 @@ router.get('/user/:userId', async (req, res) => {
 // POST ROUTES FIRST - Must be before parameterized routes to avoid conflicts
 // POST / - Create a new case with seeded requirements
 // POST /api/cases - Full Divorcee Intake Integration
-router.post('/', async (req, res) => {
+router.post('/', authenticateUser, async (req, res) => {
   console.log('🆕 POST /api/cases - Creating new case (intake, v4, uses req.user.id)');
   try {
     // Accept new payload structure
@@ -401,25 +401,33 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'User authentication required.' });
     }
     const userId = req.user.id;
+    const profile = await pool.query(`SELECT to_jsonb(u)->>'organization_id' AS organization_id
+      FROM app_users u JOIN auth.users a
+        ON a.id::text=COALESCE(to_jsonb(u)->>'user_id',to_jsonb(u)->>'id')
+      WHERE a.id::text=$1 AND a.email_confirmed_at IS NOT NULL
+        AND to_jsonb(u)->>'role'='divorcee'`, [userId]);
+    const organizationId = profile.rows[0]?.organization_id;
+    if (!organizationId) return res.status(403).json({ error: 'Verified identity and practice membership required' });
     // Validate required personal info
     if (!personalInfo.name || !personalInfo.dateOfBirth || !personalInfo.email || !personalInfo.phone || !personalInfo.address) {
       return res.status(400).json({ error: 'Missing required personal info.' });
     }
-    // 1. Create case with title and description
-    const { data: caseInsert, error: caseError } = await supabase
-      .from('cases')
-      .insert({ 
-        title, 
-        description, 
-        status, 
-        mediator_id: null 
-      })
-      .select('id, status, title, description')
-      .single();
-    if (caseError) {
-      console.error('❌ Error inserting case:', caseError);
-      return res.status(500).json({ error: 'Failed to create case.' });
-    }
+    // Persist the case and its explicit membership together, or neither.
+    const caseInsert = await withTransaction(pool, async client => {
+      const verified = await client.query(`SELECT to_jsonb(u)->>'organization_id' AS organization_id
+        FROM app_users u JOIN auth.users a
+          ON a.id::text=COALESCE(to_jsonb(u)->>'user_id',to_jsonb(u)->>'id')
+        WHERE a.id::text=$1 AND a.email_confirmed_at IS NOT NULL
+          AND lower(a.email)=lower(u.email) AND to_jsonb(u)->>'role'='divorcee'
+        FOR SHARE OF u,a`, [userId]);
+      const practice = verified.rows[0]?.organization_id;
+      if (!practice) throw Object.assign(new Error('Verified practice membership required'), { status:403 });
+      const inserted = await client.query(`INSERT INTO cases(title,description,status,mediator_id,organization_id)
+        VALUES($1,$2,$3,NULL,$4) RETURNING *`, [title,description,status,practice]);
+      await client.query(`INSERT INTO case_participants(case_id,user_id,role,status)
+        VALUES($1,$2,'divorcee','invited')`, [inserted.rows[0].id,userId]);
+      return inserted.rows[0];
+    });
     const case_id = caseInsert.id;
     // 2. Seed requirements from requirement_templates (Default Divorce)
     const { data: templates, error: templateError } = await supabase
@@ -437,13 +445,7 @@ router.post('/', async (req, res) => {
         console.error('❌ Error seeding requirements:', reqSeedError);
       }
     }
-    // 3. Add participant (divorcee)
-    const { error: partError } = await supabase
-      .from('case_participants')
-      .insert({ case_id, user_id: userId, role: 'divorcee' }, { onConflict: 'case_id,user_id' });
-    if (partError && !String(partError.message).includes('duplicate')) {
-      console.error('❌ Error inserting participant:', partError);
-    }
+    // 3. Initial membership was committed atomically with the case above.
     // 4. Add children
     let childrenRows = [];
     if (Array.isArray(children) && children.length > 0) {
@@ -584,7 +586,8 @@ router.post('/', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Error creating case:', err);
-    res.status(500).json({ error: 'Failed to create case (server error).' });
+    res.status(err.status || (['42703','42P01'].includes(err.code) ? 503 : 500))
+      .json({ error: 'Case creation unavailable.' });
   }
 });
 

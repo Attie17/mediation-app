@@ -1,0 +1,84 @@
+name: ACCORD pilot checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: accord-pilot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Security and structure
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.20.0'
+          package-manager-cache: false
+      - name: Remove inherited environment files from this ephemeral runner
+        shell: pwsh
+        run: |
+          foreach ($folder in @('backend', 'frontend')) {
+            Get-ChildItem -LiteralPath $folder -File -Force | Where-Object { $_.Name -like '.env*' } | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+          }
+      - name: Run offline security tests
+        run: npm run test:security
+      - name: Check imports, declarations and backend syntax
+        run: npm run check:offline
+
+  frontend:
+    name: Frontend build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.20.0'
+          package-manager-cache: false
+      - name: Remove inherited environment files from this ephemeral runner
+        shell: pwsh
+        run: |
+          foreach ($folder in @('backend', 'frontend')) {
+            Get-ChildItem -LiteralPath $folder -File -Force | Where-Object { $_.Name -like '.env*' } | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+          }
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile frontend
+        run: npm run build:frontend
+
+  acceptance:
+    name: Isolated SQL and HTTP acceptance
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.20.0'
+          package-manager-cache: false
+      - name: Remove inherited environment files from this ephemeral runner
+        shell: pwsh
+        run: |
+          foreach ($folder in @('backend', 'frontend')) {
+            Get-ChildItem -LiteralPath $folder -File -Force | Where-Object { $_.Name -like '.env*' } | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+          }
+      - name: Install isolated test dependencies
+        working-directory: checks/acceptance
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test real routes with fictional in-memory PostgreSQL
+        run: npm run test:acceptance

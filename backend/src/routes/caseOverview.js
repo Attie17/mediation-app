@@ -1,3 +1,4 @@
+import { resolveAuthorizedCase } from '../security/pilotAccess.js';
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { authenticateUser } from '../middleware/authenticateUser.js';
@@ -12,43 +13,7 @@ const asCamel = (row) => row;
  * Resolve case ID - accept either UUID, short_id (integer), or 'my-case' alias
  * Returns { id: uuid, short_id: number } or null if not found
  */
-async function resolveCaseId(caseIdInput, userId) {
-  // Handle special 'my-case' alias - fetch user's active case
-  if (caseIdInput === 'my-case' && userId) {
-    const result = await pool.query(
-      `SELECT c.id, c.short_id 
-       FROM public.cases c
-       JOIN public.case_participants cp ON c.id = cp.case_id
-       WHERE cp.user_id = $1
-       ORDER BY c.created_at DESC
-       LIMIT 1`,
-      [userId]
-    );
-    return result.rows[0] || null;
-  }
-  
-  // Check if it looks like a UUID (contains hyphens)
-  const isUUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(caseIdInput);
-  
-  if (isUUID) {
-    const result = await pool.query(
-      'SELECT id, short_id FROM public.cases WHERE id = $1',
-      [caseIdInput]
-    );
-    return result.rows[0] || null;
-  } else {
-    // Treat as short_id (integer)
-    const shortId = parseInt(caseIdInput, 10);
-    if (isNaN(shortId)) {
-      return null; // Invalid case ID format
-    }
-    const result = await pool.query(
-      'SELECT id, short_id FROM public.cases WHERE short_id = $1',
-      [shortId]
-    );
-    return result.rows[0] || null;
-  }
-}
+const resolveCaseId = (input, userId) => resolveAuthorizedCase(pool, input, userId);
 
 /**
  * GET /api/cases/:caseId
@@ -156,7 +121,7 @@ router.get('/:caseId/activity', async (req, res) => {
   
   try {
     // Resolve case ID (handles both UUID and short_id)
-    const resolved = await resolveCaseId(caseId);
+    const resolved = await resolveCaseId(caseId, req.user?.id || req.user?.user_id);
     if (!resolved) {
       console.log('[cases:activity] case not found', { caseId });
       return res.status(404).json({ 
@@ -209,6 +174,13 @@ router.get('/:caseId/events', async (req, res) => {
   const { caseId } = req.params;
   console.log('[cases:events] enter', { caseId, user: req.user?.user_id });
   
+  try {
+    const allowed = await resolveCaseId(caseId, req.user?.id || req.user?.user_id);
+    if (!allowed) return res.status(404).json({ ok: false, error: { code: 'CASE_NOT_FOUND', message: 'Case not found' } });
+  } catch {
+    return res.status(500).json({ ok: false, error: { code: 'CASE_ACCESS_FAILED', message: 'Case access could not be checked' } });
+  }
+
   // TODO: Implement when events/sessions table is properly linked to cases
   res.json({ ok: true, upcoming: [], past: [] });
 });

@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Heart, Frown, Smile, Meh, AlertTriangle, TrendingUp, Users, Brain } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const EmotionalAnalysis = ({ emotionalState: initialState, sessionId }) => {
   const [emotionalState, setEmotionalState] = useState(initialState);
