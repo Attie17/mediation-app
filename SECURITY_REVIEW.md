@@ -22,12 +22,14 @@ retain [skip render], which suppresses individual Render PR previews. Its commit
 also retains [skip render] to suppress Render auto-deployment. Do not remove these
 markers without separately approving a deployment and isolated runtime settings.
 
-CI uses no application secrets, starts no server, and connects to no database or
+CI uses no application secrets and connects to no production database or
 AI provider. It removes inherited environment files from each ephemeral runner
-before checking or compiling. Hosted CI has not yet been verified.
+before checking or compiling. The isolated acceptance job starts a temporary
+loopback-only router with an in-memory PostgreSQL fixture and fictional keys.
+The first security/build hosted jobs passed; hosted acceptance remains pending.
 
 These changes are a review candidate, not a production security certification.
-Legacy login, HTTP/database integration, storage permissions, invitations,
+Legacy login, full-app/deployed-database integration, storage permissions, invitations,
 account recovery, and wider case authorisation remain to be verified. Public
 legacy registration intentionally returns 503 while a verified identity flow is
 pending. Missing organisation/membership metadata denies case access.

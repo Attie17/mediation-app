@@ -10,6 +10,7 @@
     "frontend": "npm run dev --prefix frontend",
     "get-jwt": "powershell -ExecutionPolicy Bypass -File ./get-jwt.ps1",
     "test:security": "node --test checks/pilot-access.test.mjs",
+    "test:acceptance": "npm --prefix checks/acceptance test",
     "check:offline": "node checks/baseline-check.cjs",
     "build:frontend": "npm --prefix frontend run build"
   },

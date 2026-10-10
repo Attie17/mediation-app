@@ -1,0 +1,12 @@
+{
+  "name": "accord-isolated-acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test acceptance.test.mjs" },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "express": "5.1.0",
+    "jsonwebtoken": "9.0.2",
+    "uuid": "9.0.1"
+  }
+}
