@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../db.js';
 import { authenticateUser } from '../middleware/authenticateUser.js';
+import { validate as isUuid } from 'uuid';
 
 const router = express.Router();
 
@@ -283,8 +284,7 @@ router.get('/:userId/risk-assessment', authenticateUser, async (req, res) => {
   const targetUserId = req.params.userId;
 
   try {
-    // Only mediators and admins can view other users' risk assessments
-    if (requestingUser.role !== 'mediator' && requestingUser.role !== 'admin') {
+    if (!isUuid(requestingUser.id || '') || !isUuid(targetUserId || '')) {
       return res.status(403).json({ 
         ok: false, 
         error: 'Insufficient permissions' 
@@ -293,23 +293,30 @@ router.get('/:userId/risk-assessment', authenticateUser, async (req, res) => {
 
     const query = `
       SELECT 
-        u.id,
+        u.user_id AS id,
         u.email,
         u.first_name,
         u.last_name,
         u.risk_assessment,
         cp.case_id
       FROM app_users u
-      LEFT JOIN case_participants cp ON u.id = cp.user_id
-      WHERE u.id = $1
+      JOIN case_participants cp ON u.user_id = cp.user_id
+      JOIN cases c ON c.id = cp.case_id
+      JOIN app_users mediator ON mediator.user_id=c.mediator_id
+      WHERE u.user_id = $1 AND mediator.user_id=$2
+        AND mediator.role='mediator'
+        AND mediator.organization_id=c.organization_id
+        AND u.organization_id=c.organization_id
+        AND cp.status='active' AND cp.role='divorcee'
+      ORDER BY c.id LIMIT 1
     `;
     
-    const result = await pool.query(query, [targetUserId]);
+    const result = await pool.query(query, [targetUserId,requestingUser.id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(403).json({
         ok: false, 
-        error: 'User not found' 
+        error: 'Assigned mediator access required'
       });
     }
 

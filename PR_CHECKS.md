@@ -6,7 +6,7 @@ This draft introduces a workflow triggered by pull requests or manual runs. Host
 
 - Security and structure: fictional-data security tests; import/dependency and backend syntax checks.
 - Frontend build: lockfile installation with lifecycle scripts disabled and compilation.
-- Isolated acceptance: 41 tests executing SQL in memory and the real case/participant/profile routers and JWT middleware on loopback with fictional data. See checks/acceptance/README.md.
+- Isolated acceptance: 51 tests executing SQL in memory and the real case/participant/profile/intake/safety-summary routers and JWT middleware on loopback with fictional data. See checks/acceptance/README.md.
 
 All jobs use Windows and Node 20.20.0 to match the environment already checked locally. GitHub actions have their own runtime, separate from this application Node version. Node runtime lifecycle/upgrade review remains a separate task. Linux portability is not verified.
 

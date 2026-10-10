@@ -1,86 +1,41 @@
 import express from 'express';
-import { supabase, requireSupabaseOr500 } from '../lib/supabaseClient.js';
-
-
+import { pool } from '../db.js';
+import { authenticateUser } from '../middleware/authenticateUser.js';
+import { validate as isUuid } from 'uuid';
 const router = express.Router();
-router.use((req,res,next)=>{ if(!supabase) return requireSupabaseOr500(res); next(); });
-
-// GET /health : check Supabase connectivity
-router.get('/health', async (req, res) => {
-	try {
-		const { data, error } = await supabase
-			.from('app_users')
-			.select('*')
-			.limit(1);
-		if (error) {
-			return res.status(500).json({ success: false, error: error.message });
-		}
-		res.json({ success: true, data });
-	} catch (err) {
-		res.status(500).json({ success: false, error: err.message });
-	}
+router.use(authenticateUser);
+// Connectivity checks never return profiles or create demonstration records.
+router.get('/health', (_req,res)=>res.json({success:true}));
+router.post('/test', (_req,res)=>res.status(405).json({success:false,error:'Demonstration writes are disabled'}));
+async function owner(req,res,target=req.user?.id) {
+  if (!isUuid(req.user?.id || '') || target !== req.user.id) {
+    res.status(403).json({success:false,error:'Private intake is accessible only to its owner'});
+    return false;
+  }
+  const {rows}=await pool.query(`SELECT user_id FROM app_users
+    WHERE user_id=$1 AND role='divorcee' AND organization_id IS NOT NULL`,[req.user.id]);
+  if(rows.length!==1) {
+    res.status(403).json({success:false,error:'An authorised preparation profile is required'});
+    return false;
+  }
+  return true;
+}
+router.post('/',async(req,res)=>{
+  try {
+    if(!await owner(req,res,req.body.userId ?? req.user.id)) return;
+    const {step,answers}=req.body;
+    if(typeof step!=='string' || !step.trim() || step.length>100 || !answers || typeof answers!=='object' || Array.isArray(answers))
+      return res.status(400).json({success:false,error:'A step and answer object are required'});
+    const {rows}=await pool.query('INSERT INTO intake_answers(user_id,step,answers) VALUES($1,$2,$3) RETURNING *',
+      [req.user.id,step,JSON.stringify(answers)]);
+    return res.json({success:true,data:rows});
+  }catch(_error){return res.status(503).json({success:false,error:'Private intake is unavailable'});}
 });
-
-
-// POST /test : insert dummy record to check Supabase DB connectivity
-router.post('/test', async (req, res) => {
-	try {
-		const { data, error } = await supabase
-			.from('intake_answers')
-			.insert([
-				{
-					user_id: 1,
-					step: 'Step1',
-					answers: { demo: 'ok' }
-				}
-			]);
-		if (error) {
-			console.error('Supabase insert error:', error);
-			return res.status(500).json({ success: false, error });
-		}
-		res.json({ success: true, data });
-	} catch (err) {
-		console.error('Test DB connectivity error:', err);
-		res.status(500).json({ success: false, error: err.message });
-	}
+router.get('/:userId',async(req,res)=>{
+  try {
+    if(!await owner(req,res,req.params.userId)) return;
+    const {rows}=await pool.query('SELECT * FROM intake_answers WHERE user_id=$1',[req.user.id]);
+    return res.json({success:true,data:rows});
+  }catch(_error){return res.status(503).json({success:false,error:'Private intake is unavailable'});}
 });
-
-// POST / : save intake answers using Supabase
-router.post('/', async (req, res) => {
-	const { userId, step, answers } = req.body;
-	try {
-		const { data, error } = await supabase
-			.from('intake_answers')
-			.insert([{ user_id: userId, step, answers }])
-			.select();
-		if (error) {
-			console.error('Intake POST error:', error);
-			return res.status(500).json({ success: false, error: error.message, details: error });
-		}
-		res.json({ success: true, data });
-	} catch (err) {
-		console.error('Intake POST error:', err);
-		res.status(500).json({ success: false, error: err.message });
-	}
-});
-
-// GET /:userId : fetch all intake answers for a user using Supabase
-router.get('/:userId', async (req, res) => {
-	const { userId } = req.params;
-	try {
-		const { data, error } = await supabase
-			.from('intake_answers')
-			.select('*')
-			.eq('user_id', userId);
-		if (error) {
-			console.error('Intake GET error:', error);
-			return res.status(500).json({ success: false, error: error.message, details: error });
-		}
-		res.json({ success: true, data: data || [] });
-	} catch (err) {
-		console.error('Intake GET error:', err);
-		res.status(500).json({ success: false, error: err.message });
-	}
-});
-
 export default router;
