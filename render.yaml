@@ -1,3 +1,5 @@
+previews:
+  generation: off
 services:
   - type: web
     name: mediation-app-backend

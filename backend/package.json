@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "check:offline": "node ../checks/baseline-check.cjs",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "kill": "node kill-node.cjs"
@@ -25,15 +26,14 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
-    "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.10",
     "openai": "4.77.0",
     "pg": "^8.11.3",
-    "tavily": "^1.0.2",
     "uuid": "^9.0.1",
     "winston": "^3.18.3",
-    "zod": "^3.23.8"
+    "@tavily/core": "0.7.13"
   },
+  "private": true,
   "devDependencies": {
     "nodemon": "^3.1.10"
   }

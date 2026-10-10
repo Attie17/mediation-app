@@ -8,7 +8,10 @@
     "dev": "npm run start",
     "backend": "npm run dev --prefix backend",
     "frontend": "npm run dev --prefix frontend",
-    "get-jwt": "powershell -ExecutionPolicy Bypass -File ./get-jwt.ps1"
+    "get-jwt": "powershell -ExecutionPolicy Bypass -File ./get-jwt.ps1",
+    "test:security": "node --test checks/pilot-access.test.mjs",
+    "check:offline": "node checks/baseline-check.cjs",
+    "build:frontend": "npm --prefix frontend run build"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",

@@ -328,7 +328,7 @@ router.post('/token/:token/accept', async (req, res) => {
     }
 
     // Hash password
-    const bcrypt = await import('bcrypt');
+    const { default: bcrypt } = await import('bcryptjs');
     const password_hash = await bcrypt.hash(password, 10);
 
     // Create user

@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, Play, Pause, Settings } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const VoiceAssistant = ({ 
   isListening, 

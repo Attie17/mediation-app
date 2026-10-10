@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Languages, Volume2, Copy, ArrowLeftRight, Globe, CheckCircle } from 'lucide-react';
-import { apiFetch } from '../../../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 const TranslationService = ({ currentLanguage, setCurrentLanguage }) => {
   const [sourceText, setSourceText] = useState('');
