@@ -10,17 +10,20 @@ Local restricted environments may need permission for loopback HTTP traffic.
 
 PGlite runs actual PostgreSQL in memory. Fictional UUIDs and example.invalid
 addresses are created and discarded; no production connection string is used.
-A module loader replaces the case router's db.js import with this database.
-It permits only the case router, JWT middleware and permission helper from the
-application. No index.js, environment loader, provider client or old test script
-is loaded. Authentication uses fictional signing keys, production mode, and no
+A module loader replaces db.js with this database, Supabase with a local SQL-backed
+fixture, and notifications with an in-memory recorder. It permits the case,
+participant and overview routers, JWT middleware, permission helpers and transaction
+utility. No index.js, environment loader, provider SDK or old test script is loaded.
+Authentication uses fictional signing keys, production mode, and no
 pre-populated req.user. The temporary HTTP server binds only 127.0.0.1 on a random
 port, then closes. This is an integration fixture, not the full application.
 
-Ten tests cover SQL identifier resolution, organisation separation, inactive
+Thirty-three tests cover SQL identifier resolution, organisation separation, inactive
 membership, assigned mediators, administrator denial, malformed input, JWT
 rejection, denied requests before content queries, successful overview/activity,
-and missing schema fields. The events endpoint remains an empty response stub.
+and missing schema fields, both participant APIs, explicit activation, revocation,
+same-practice verified targets, atomic case creation/rollback and reopening.
+The events endpoint remains an empty response stub.
 
 ## Confirmed compatibility limits
 
@@ -30,20 +33,23 @@ and missing schema fields. The events endpoint remains an empty response stub.
   legacy participants, including valid fictional users. This is deliberate denial,
   not proof of a complete lifecycle/consent model.
 - 001-create-organizations-schema.sql adds organisation IDs and case_assignments.
-  A mediator assignment in that table alone is not recognised by the current
-  cases.mediator_id predicate. The fixture demonstrates the denial. The deployed
+  Normal assignment/reassignment already mirrors the active assignment into
+  cases.mediator_id transactionally. A table-only fixture represents inconsistent
+  or legacy data and remains denied; it does not demonstrate failure of normal assignment. The deployed
   database layout has not been inspected and must not be inferred from migrations.
 - With JWT_SECRET configured but SUPABASE_JWT_SECRET absent, an invalid JWT yields
   500 rather than 401. It still denies access and performs no SQL. This existing
   configuration-dependent response is recorded, not silently changed.
 
-Recommended next decision: verify authoritative schema metadata and approve the
-participant lifecycle and mediator-assignment source before adapting runtime
-queries. Do not infer active membership from a row's existence or auto-backfill
-consent. No production migration or schema change is included here.
+The founder approved the membership repair. Both participant APIs now deny missing
+status, require current assigned-mediator authority for writes, use verified existing
+targets and retain removed membership. Reopening retains revocation. Case creation
+records the server-derived practice and invited membership atomically. See
+MEMBERSHIP_REPAIR.md. participant-status.sql is a test-only schema candidate, not an
+automatic production migration. Deployed schema evidence is still required.
 
-Not covered: full middleware/routing order, registration HTTP route, browser UI,
+Not covered: full application middleware/routing order, registration HTTP route, browser UI,
 storage policies, Supabase verification service, RLS, deployed schema, database
-pooling, invitations, recovery, private spouse disclosures or wider case endpoints.
+pooling/concurrency, delivery of invitation emails, recovery, private spouse disclosures or wider case endpoints.
 The fixture models selected table shapes; it does not execute all historical
 migrations or certify production readiness.

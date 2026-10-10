@@ -13,7 +13,7 @@ export function canReadCase(caseRecord, identity, membership) {
   return membership?.status === 'active' && String(membership.user_id) === String(identity.id);
 }
 
-export async function resolveAuthorizedCase(db, input, userId) {
+async function findCaseAccess(db, input, userId, permits) {
   if (!userId || typeof input !== 'string') return null;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const short = /^[1-9][0-9]*$/;
@@ -25,7 +25,9 @@ export async function resolveAuthorizedCase(db, input, userId) {
       to_jsonb(c)->>'organization_id' AS organization_id,
       to_jsonb(c)->>'mediator_id' AS mediator_id,
       to_jsonb(u)->>'organization_id' AS actor_organization_id,
-      cp.user_id AS member_user_id, to_jsonb(cp)->>'status' AS member_status
+      to_jsonb(u)->>'role' AS actor_role, to_jsonb(c)->>'status' AS case_status,
+      cp.user_id AS member_user_id, to_jsonb(cp)->>'status' AS member_status,
+      to_jsonb(cp)->>'role' AS member_role
     FROM public.cases c
     JOIN public.app_users u
       ON COALESCE(to_jsonb(u)->>'user_id', to_jsonb(u)->>'id') = $2
@@ -35,7 +37,29 @@ export async function resolveAuthorizedCase(db, input, userId) {
   for (const row of rows) {
     const identity = { id: userId, organization_id: row.actor_organization_id };
     const membership = { user_id: row.member_user_id, status: row.member_status };
-    if (canReadCase(row, identity, membership)) return { id: row.id, short_id: row.short_id };
+    if (permits(row, identity, membership)) return {
+      id: row.id, short_id: row.short_id, organization_id: row.organization_id
+    };
   }
   return null;
+}
+
+export async function resolveAuthorizedCase(db, input, userId) {
+  const found = await findCaseAccess(db, input, userId, canReadCase);
+  return found ? { id: found.id, short_id: found.short_id } : null;
+}
+
+export async function resolveMediatorCase(db, input, userId) {
+  return findCaseAccess(db, input, userId, (row, identity, membership) =>
+    canReadCase(row, identity, membership) && row.actor_role === 'mediator' &&
+    String(row.mediator_id) === String(userId) && !['closed', 'completed'].includes(row.case_status));
+}
+
+export async function resolveInvitationCase(db, input, userId) {
+  return findCaseAccess(db, input, userId, (row, identity, membership) =>
+    identity.organization_id && row.organization_id &&
+    String(identity.organization_id) === String(row.organization_id) &&
+    row.actor_role === 'divorcee' && row.member_role === 'divorcee' &&
+    String(membership.user_id) === String(userId) && ['invited', 'active'].includes(membership.status) &&
+    !['closed', 'completed'].includes(row.case_status));
 }

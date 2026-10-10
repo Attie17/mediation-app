@@ -32,11 +32,13 @@ after(async () => {
 async function request(path, user, tokenOverride) {
   const token = tokenOverride ?? (user ? jwt.sign({ sub: id(user) }, process.env.JWT_SECRET, { expiresIn: 60 }) : null);
   const previous = console.log;
+  const previousError = console.error;
   console.log = () => {}; // Existing middleware logs token fragments; keep them out of test output.
+  console.error = () => {};
   try {
     const response = await fetch(base + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     return { status: response.status, body: await response.json() };
-  } finally { console.log = previous; }
+  } finally { console.log = previous; console.error = previousError; }
 }
 
 test('real PostgreSQL resolves UUID, numeric ID and alias for an active participant', async () => {

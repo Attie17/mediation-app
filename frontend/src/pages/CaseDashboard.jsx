@@ -256,7 +256,7 @@ const CaseDashboard = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">Status</span>
-                      <StatusPill status={userParticipant.status || 'active'} />
+                      <StatusPill status={userParticipant.status || 'pending_review'} />
                     </div>
                     {userParticipant.created_at && (
                       <div className="flex items-center justify-between">
