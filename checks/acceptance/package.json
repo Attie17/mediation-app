@@ -2,7 +2,7 @@
   "name": "accord-isolated-acceptance",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test acceptance.test.mjs membership.test.mjs" },
+  "scripts": { "test": "node --test acceptance.test.mjs membership.test.mjs profile.test.mjs" },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
     "express": "5.1.0",

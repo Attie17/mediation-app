@@ -12,17 +12,19 @@ PGlite runs actual PostgreSQL in memory. Fictional UUIDs and example.invalid
 addresses are created and discarded; no production connection string is used.
 A module loader replaces db.js with this database, Supabase with a local SQL-backed
 fixture, and notifications with an in-memory recorder. It permits the case,
-participant and overview routers, JWT middleware, permission helpers and transaction
+participant, profile and overview routers, JWT middleware, permission helpers and transaction
 utility. No index.js, environment loader, provider SDK or old test script is loaded.
 Authentication uses fictional signing keys, production mode, and no
 pre-populated req.user. The temporary HTTP server binds only 127.0.0.1 on a random
 port, then closes. This is an integration fixture, not the full application.
 
-Thirty-three tests cover SQL identifier resolution, organisation separation, inactive
+Forty-one tests cover SQL identifier resolution, organisation separation, inactive
 membership, assigned mediators, administrator denial, malformed input, JWT
 rejection, denied requests before content queries, successful overview/activity,
 and missing schema fields, both participant APIs, explicit activation, revocation,
 same-practice verified targets, atomic case creation/rollback and reopening.
+Eight profile regressions also cover privileged role rejection, safe profile creation,
+ordinary intake updates, preserved existing authority and forged role claims.
 The events endpoint remains an empty response stub.
 
 ## Confirmed compatibility limits

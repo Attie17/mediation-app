@@ -12,7 +12,8 @@ export async function resolve(specifier, context, nextResolve) {
   }
   if (resolved.includes('/backend/src/') && ![
     '/routes/caseOverview.js', '/middleware/authenticateUser.js', '/security/pilotAccess.js',
-    '/routes/participants.js','/routes/caseParticipants.js','/routes/cases.js','/security/membership.js','/utils/tx.js'
+    '/routes/participants.js','/routes/caseParticipants.js','/routes/cases.js','/security/membership.js','/utils/tx.js',
+    '/routes/users.js','/lib/activityLogger.js'
   ].some(suffix => resolved.endsWith(suffix))) {
     throw new Error('Unapproved application module in acceptance test');
   }
